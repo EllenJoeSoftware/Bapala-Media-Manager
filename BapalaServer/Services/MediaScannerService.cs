@@ -60,14 +60,23 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
         IProgress<ScanProgress>? progress = null,
         CancellationToken ct = default)
     {
-        var files = folders
-            .Where(Directory.Exists)
-            .SelectMany(f => Directory.EnumerateFiles(f, "*", SearchOption.AllDirectories))
-            .Where(IsVideoFile)
-            .ToList();
+        var errors = new List<string>();
+        var files = new List<string>();
+        foreach (var folder in folders.Where(Directory.Exists))
+        {
+            try
+            {
+                files.AddRange(
+                    Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+                             .Where(IsVideoFile));
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                errors.Add($"Cannot access folder '{folder}': {ex.Message}");
+            }
+        }
 
         int added = 0, updated = 0, skipped = 0;
-        var errors = new List<string>();
 
         for (int i = 0; i < files.Count; i++)
         {
@@ -106,7 +115,10 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
                         item.BackdropPath = meta.BackdropPath;
                     }
                 }
-                catch { /* metadata failure is non-critical */ }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // metadata failure is non-critical — but honour cancellation
+                }
 
                 await repo.AddAsync(item);
                 added++;
