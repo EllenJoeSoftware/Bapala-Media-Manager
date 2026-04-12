@@ -43,6 +43,10 @@ builder.Services.AddAuthorization();
 // Services (stubs for later tasks — will be fully implemented in Tasks 5-10)
 builder.Services.AddScoped<IMediaRepository, SqliteMediaRepository>();
 builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<IMediaScannerService, MediaScannerService>();
+builder.Services.AddScoped<ITmdbService, TmdbService>();
+builder.Services.AddSingleton<IMdnsService, MdnsService>();
+builder.Services.AddHostedService(p => (MdnsService)p.GetRequiredService<IMdnsService>());
 
 // ASP.NET Core
 builder.Services.AddControllers();
@@ -76,6 +80,7 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<BapalaServer.Hubs.ScanProgressHub>("/hubs/scan");
 
 app.Run();
 
