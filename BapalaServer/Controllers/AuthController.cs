@@ -17,7 +17,12 @@ public class AuthController(IJwtService jwtService, IConfiguration config) : Con
         var expectedUsername = config["Bapala:Username"] ?? "admin";
         var expectedPassword = config["Bapala:Password"] ?? "changeme";
 
-        if (req.Username != expectedUsername || req.Password != expectedPassword)
+        static bool SafeEquals(string a, string b) =>
+            System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(a),
+                System.Text.Encoding.UTF8.GetBytes(b));
+
+        if (!SafeEquals(req.Username, expectedUsername) || !SafeEquals(req.Password, expectedPassword))
             return Unauthorized(new { error = "Invalid credentials" });
 
         var token = jwtService.GenerateToken(req.Username);

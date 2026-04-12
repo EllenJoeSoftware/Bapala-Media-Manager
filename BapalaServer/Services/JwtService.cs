@@ -45,7 +45,9 @@ public class JwtService(IConfiguration config) : IJwtService
             username = principal.Identity?.Name ?? string.Empty;
             return true;
         }
-        catch
+        catch (Exception ex) when (ex is Microsoft.IdentityModel.Tokens.SecurityTokenException
+                                      or ArgumentException
+                                      or FormatException)
         {
             return false;
         }
