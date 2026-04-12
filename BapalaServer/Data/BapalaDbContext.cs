@@ -10,6 +10,8 @@ public class BapalaDbContext(DbContextOptions<BapalaDbContext> options) : DbCont
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<MediaItem>(e =>
         {
             e.HasIndex(m => m.Title);
@@ -24,6 +26,8 @@ public class BapalaDbContext(DbContextOptions<BapalaDbContext> options) : DbCont
              .WithMany(m => m.WatchHistory)
              .HasForeignKey(w => w.MediaItemId)
              .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(w => new { w.MediaItemId, w.WatchedAt });
         });
     }
 }
