@@ -18,6 +18,7 @@ public class BapalaDbContext(DbContextOptions<BapalaDbContext> options) : DbCont
             e.HasIndex(m => m.Type);
             e.HasIndex(m => m.Year);
             e.HasIndex(m => m.IsFavorite);
+            e.HasIndex(m => m.FilePath).IsUnique();
         });
 
         modelBuilder.Entity<WatchHistory>(e =>
@@ -27,7 +28,8 @@ public class BapalaDbContext(DbContextOptions<BapalaDbContext> options) : DbCont
              .HasForeignKey(w => w.MediaItemId)
              .OnDelete(DeleteBehavior.Cascade);
 
-            e.HasIndex(w => new { w.MediaItemId, w.WatchedAt });
+            e.HasIndex(w => w.MediaItemId).IsUnique();         // one progress row per media item
+            e.HasIndex(w => w.WatchedAt);                       // sort by recently watched
         });
     }
 }

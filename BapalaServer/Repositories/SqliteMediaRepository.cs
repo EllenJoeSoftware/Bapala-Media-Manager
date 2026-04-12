@@ -11,12 +11,14 @@ public class SqliteMediaRepository(BapalaDbContext db) : IMediaRepository
     {
         var q = db.MediaItems.AsQueryable();
         if (type.HasValue) q = q.Where(m => m.Type == type.Value);
-        if (!string.IsNullOrWhiteSpace(genre)) q = q.Where(m => m.Genres != null && m.Genres.Contains(genre));
+        if (!string.IsNullOrWhiteSpace(genre))
+            q = q.Where(m => m.Genres != null && (
+                m.Genres == genre ||
+                EF.Functions.Like(m.Genres, genre + ",%") ||
+                EF.Functions.Like(m.Genres, "%," + genre) ||
+                EF.Functions.Like(m.Genres, "%," + genre + ",%")));
         if (!string.IsNullOrWhiteSpace(search))
-        {
-            var lower = search.ToLower();
-            q = q.Where(m => m.Title.ToLower().Contains(lower));
-        }
+            q = q.Where(m => EF.Functions.Like(m.Title, $"%{search}%"));
         if (favoritesOnly) q = q.Where(m => m.IsFavorite);
         return await q.OrderByDescending(m => m.DateAdded)
                       .Skip((page - 1) * limit).Take(limit)
@@ -27,12 +29,14 @@ public class SqliteMediaRepository(BapalaDbContext db) : IMediaRepository
     {
         var q = db.MediaItems.AsQueryable();
         if (type.HasValue) q = q.Where(m => m.Type == type.Value);
-        if (!string.IsNullOrWhiteSpace(genre)) q = q.Where(m => m.Genres != null && m.Genres.Contains(genre));
+        if (!string.IsNullOrWhiteSpace(genre))
+            q = q.Where(m => m.Genres != null && (
+                m.Genres == genre ||
+                EF.Functions.Like(m.Genres, genre + ",%") ||
+                EF.Functions.Like(m.Genres, "%," + genre) ||
+                EF.Functions.Like(m.Genres, "%," + genre + ",%")));
         if (!string.IsNullOrWhiteSpace(search))
-        {
-            var lower = search.ToLower();
-            q = q.Where(m => m.Title.ToLower().Contains(lower));
-        }
+            q = q.Where(m => EF.Functions.Like(m.Title, $"%{search}%"));
         if (favoritesOnly) q = q.Where(m => m.IsFavorite);
         return await q.CountAsync();
     }
