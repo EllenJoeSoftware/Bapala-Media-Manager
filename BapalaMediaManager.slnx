@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="BapalaServer.Tests/BapalaServer.Tests.csproj" />
+  <Project Path="BapalaServer/BapalaServer.csproj" />
+</Solution>
