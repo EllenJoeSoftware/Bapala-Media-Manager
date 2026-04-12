@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bapala — Login</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <h1>Bapala</h1>
+    <p id="serverName">Media Manager</p>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" value="admin" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" type="submit">Sign In</button>
+      <div class="error-msg" id="error" role="alert"></div>
+    </form>
+  </div>
+</div>
+<script>
+  fetch('/api/auth/info').then(r => r.json())
+    .then(d => { document.getElementById('serverName').textContent = d.serverName; })
+    .catch(() => {});
+
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const err = document.getElementById('error');
+    err.textContent = '';
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value
+        })
+      });
+      if (!resp.ok) { err.textContent = 'Invalid credentials'; return; }
+      const data = await resp.json();
+      localStorage.setItem('bapala_token', data.token);
+      location.href = '/index.html';
+    } catch {
+      err.textContent = 'Connection failed. Is the server running?';
+    }
+  });
+</script>
+</body>
+</html>
