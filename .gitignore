@@ -1,0 +1,48 @@
+# Build output
+bin/
+obj/
+out/
+
+# .NET
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.swp
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Published output
+publish/
+wwwroot/posters/
+wwwroot/backdrops/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp Word lock files
+~$*
