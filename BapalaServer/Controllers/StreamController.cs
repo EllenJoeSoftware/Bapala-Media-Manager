@@ -7,7 +7,7 @@ namespace BapalaServer.Controllers;
 [ApiController]
 [Route("api/stream")]
 [Authorize]
-public class StreamController(IMediaRepository repo) : ControllerBase
+public class StreamController(IMediaRepository repo, IConfiguration config) : ControllerBase
 {
     private static readonly Dictionary<string, string> MimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -38,6 +38,19 @@ public class StreamController(IMediaRepository repo) : ControllerBase
 
         if (!System.IO.File.Exists(item.FilePath))
             return NotFound(new { error = "File not found on disk" });
+
+        // Confine streaming to configured media folders to prevent path traversal
+        var foldersRaw = config["Bapala:MediaFolders"] ?? "";
+        var allowedFolders = foldersRaw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(f => Path.GetFullPath(f))
+            .ToList();
+        var fullPath = Path.GetFullPath(item.FilePath);
+        if (allowedFolders.Count > 0 &&
+            !allowedFolders.Any(f => fullPath.StartsWith(f, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Forbid();
+        }
 
         var mime = GetMimeType(Path.GetExtension(item.FilePath));
         return PhysicalFile(item.FilePath, mime, enableRangeProcessing: true);

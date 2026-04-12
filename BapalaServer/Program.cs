@@ -45,8 +45,9 @@ builder.Services.AddScoped<IMediaRepository, SqliteMediaRepository>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IMediaScannerService, MediaScannerService>();
 builder.Services.AddScoped<ITmdbService, TmdbService>();
-builder.Services.AddSingleton<IMdnsService, MdnsService>();
-builder.Services.AddHostedService(p => (MdnsService)p.GetRequiredService<IMdnsService>());
+builder.Services.AddSingleton<MdnsService>();
+builder.Services.AddSingleton<IMdnsService>(p => p.GetRequiredService<MdnsService>());
+builder.Services.AddHostedService(p => p.GetRequiredService<MdnsService>());
 
 // ASP.NET Core
 builder.Services.AddControllers();
