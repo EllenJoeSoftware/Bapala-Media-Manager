@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using BapalaServer.Controllers;
 using BapalaServer.Hubs;
 using BapalaServer.Models;
 using BapalaServer.Repositories;
-using BapalaServer.Services;
 using Microsoft.AspNetCore.SignalR;
 using Xunit;
 
@@ -16,19 +16,21 @@ public class MediaControllerTests
     private static MediaController CreateController(IMediaRepository? repo = null)
     {
         repo ??= new Mock<IMediaRepository>().Object;
-        var scanner = new Mock<IMediaScannerService>().Object;
-        var hubContext = new Mock<IHubContext<ScanProgressHub>>();
+        var hubContext = new Mock<IHubContext<ScanProgressHub>>().Object;
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Bapala:MediaFolders"] = "" })
             .Build();
-        return new MediaController(repo, scanner, hubContext.Object, config);
+        // IServiceScopeFactory is only used for scan + TMDB refresh paths, not the
+        // endpoints under test — a simple mock is sufficient.
+        var scopeFactory = new Mock<IServiceScopeFactory>().Object;
+        return new MediaController(repo, hubContext, config, scopeFactory);
     }
 
     [Fact]
     public async Task GetAll_Returns200WithList()
     {
         var repoMock = new Mock<IMediaRepository>();
-        repoMock.Setup(r => r.GetAllAsync(1, 20, null, null, null, false))
+        repoMock.Setup(r => r.GetAllAsync(1, 20, null, null, null, false, "dateAdded", true))
                 .ReturnsAsync([new MediaItem { Id = 1, Title = "Inception", Type = MediaType.Movie,
                     FilePath = "/a.mkv", DateAdded = DateTime.UtcNow }]);
         repoMock.Setup(r => r.CountAsync(null, null, null, false)).ReturnsAsync(1);
@@ -68,9 +70,9 @@ public class StreamControllerTests
     [Fact]
     public void GetMimeType_ReturnsCorrectType()
     {
-        Assert.Equal("video/mp4", StreamController.GetMimeType(".mp4"));
-        Assert.Equal("video/x-matroska", StreamController.GetMimeType(".mkv"));
-        Assert.Equal("video/x-msvideo", StreamController.GetMimeType(".avi"));
+        Assert.Equal("video/mp4",              StreamController.GetMimeType(".mp4"));
+        Assert.Equal("video/x-matroska",       StreamController.GetMimeType(".mkv"));
+        Assert.Equal("video/x-msvideo",        StreamController.GetMimeType(".avi"));
         Assert.Equal("application/octet-stream", StreamController.GetMimeType(".xyz"));
     }
 }
