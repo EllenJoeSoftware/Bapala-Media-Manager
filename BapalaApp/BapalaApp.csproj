@@ -7,6 +7,8 @@
     <SingleProject>true</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Enable compiled XAML bindings that use RelativeSource/Source so XC0025 is suppressed -->
+    <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
 
     <!-- App metadata -->
     <ApplicationTitle>Bapala</ApplicationTitle>
@@ -28,6 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Required explicit reference since .NET 8+ no longer auto-includes this -->
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
+    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.120" />
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
     <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="4.1.2" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

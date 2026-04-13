@@ -8,19 +8,20 @@ public partial class LoginViewModel : BaseViewModel
 {
     private readonly BapalaApiService _api;
 
-    [ObservableProperty] private string _serverUrl  = "http://";
-    [ObservableProperty] private string _username   = "admin";
-    [ObservableProperty] private string _password   = string.Empty;
-    [ObservableProperty] private string _errorText  = string.Empty;
+    [ObservableProperty] private string _serverUrl = "http://";
+    [ObservableProperty] private string _username  = "admin";
+    [ObservableProperty] private string _password  = string.Empty;
+    [ObservableProperty] private string _errorText = string.Empty;
 
     public LoginViewModel(BapalaApiService api)
     {
         _api = api;
         Title = "Sign In";
 
-        // Pre-fill server URL if we've connected before
-        if (!string.IsNullOrEmpty(Preferences.Get("bapala_server_url", null)))
-            ServerUrl = Preferences.Get("bapala_server_url", "http://");
+        // Pre-fill server URL from previous session
+        var saved = Preferences.Get("bapala_server_url", string.Empty);
+        if (!string.IsNullOrEmpty(saved))
+            ServerUrl = saved;
     }
 
     [RelayCommand]
@@ -39,13 +40,15 @@ public partial class LoginViewModel : BaseViewModel
 
         try
         {
-            var (success, error, serverName) = await _api.LoginAsync(ServerUrl, Username, Password);
+            var (success, error, _) = await _api.LoginAsync(ServerUrl, Username, Password);
 
             if (!success)
             { ErrorText = error ?? "Login failed."; return; }
 
-            // Replace the navigation root so Back can't return to Login
-            Application.Current!.MainPage = new AppShell();
+            // Replace root page — use Windows[0].Page (MAUI .NET 9 pattern)
+            // so Back cannot navigate back to the login screen.
+            if (Application.Current?.Windows.Count > 0)
+                Application.Current.Windows[0].Page = new AppShell();
         }
         finally
         {

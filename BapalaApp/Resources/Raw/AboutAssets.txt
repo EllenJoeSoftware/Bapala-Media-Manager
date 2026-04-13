@@ -1,0 +1,1 @@
+Any raw assets you place in this directory will be accessible in your application via the filename.

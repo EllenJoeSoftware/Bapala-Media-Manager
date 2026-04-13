@@ -10,10 +10,16 @@ namespace BapalaApp.Services;
 /// Single entry-point for all communication with the Bapala server REST API.
 /// Persists the server URL in Preferences (plain text) and the JWT token in
 /// SecureStorage (Android Keystore / iOS Keychain).
+///
+/// IMPORTANT: SecureStorage is async-only on Android — never call
+/// .GetAwaiter().GetResult() on the main thread; it deadlocks because Android's
+/// Looper needs to be free to handle the Keystore callback.
+/// We solve this with a two-phase init: the constructor sets up the HttpClient
+/// without touching SecureStorage; InitAsync() is called once from App.xaml.cs
+/// before the first page is shown.
 /// </summary>
 public class BapalaApiService
 {
-    // ── JSON options — must match the server's JsonStringEnumConverter setup ──
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -21,6 +27,7 @@ public class BapalaApiService
     };
 
     private readonly HttpClient _http;
+    private string? _cachedToken;   // kept in memory after InitAsync so GetStreamUrl never blocks
 
     public string? ServerUrl { get; private set; }
     public bool IsAuthenticated { get; private set; }
@@ -29,27 +36,42 @@ public class BapalaApiService
     {
         _http = new HttpClient(new HttpClientHandler
         {
-            // Allow self-signed certs on the local network (common for home servers)
+            // Allow self-signed / HTTP on the local network
             ServerCertificateCustomValidationCallback = (_, _, _, _) => true
         });
         _http.Timeout = TimeSpan.FromSeconds(15);
 
-        // Restore saved server URL from previous session
+        // Preferences is synchronous and safe to call here
         ServerUrl = Preferences.Get("bapala_server_url", string.Empty);
+    }
 
-        // Restore JWT token — SecureStorage is async but we need it synchronously here.
-        // In production, prefer an async initialisation method; this is safe for startup.
-        var token = SecureStorage.GetAsync("bapala_jwt").GetAwaiter().GetResult();
-        if (!string.IsNullOrEmpty(token))
+    /// <summary>
+    /// Must be awaited once during app startup (in App.xaml.cs CreateWindow) before
+    /// IsAuthenticated is read. Loads the JWT from SecureStorage asynchronously.
+    /// </summary>
+    public async Task InitAsync()
+    {
+        try
         {
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            _cachedToken = await SecureStorage.GetAsync("bapala_jwt");
+        }
+        catch
+        {
+            // SecureStorage can throw on Android if the Keystore is unavailable
+            // (e.g. after a device PIN change). Treat as logged-out.
+            _cachedToken = null;
+        }
+
+        if (!string.IsNullOrEmpty(_cachedToken))
+        {
+            _http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _cachedToken);
             IsAuthenticated = true;
         }
     }
 
     // ── Authentication ────────────────────────────────────────────────────────
 
-    /// <summary>Attempts login; saves credentials on success.</summary>
     public async Task<(bool Success, string? Error, string? ServerName)> LoginAsync(
         string serverUrl, string username, string password)
     {
@@ -57,7 +79,6 @@ public class BapalaApiService
 
         try
         {
-            // Temporarily clear auth header for the login request itself
             _http.DefaultRequestHeaders.Authorization = null;
 
             var resp = await _http.PostAsJsonAsync(
@@ -73,8 +94,8 @@ public class BapalaApiService
             var data = await resp.Content.ReadFromJsonAsync<LoginResponse>(JsonOpts);
             if (data == null) return (false, "Server returned an empty response.", null);
 
-            // Persist
-            ServerUrl = url;
+            ServerUrl    = url;
+            _cachedToken = data.Token;
             Preferences.Set("bapala_server_url", url);
             await SecureStorage.SetAsync("bapala_jwt", data.Token);
 
@@ -97,6 +118,7 @@ public class BapalaApiService
     public void Logout()
     {
         _http.DefaultRequestHeaders.Authorization = null;
+        _cachedToken  = null;
         IsAuthenticated = false;
         SecureStorage.Remove("bapala_jwt");
     }
@@ -110,9 +132,9 @@ public class BapalaApiService
         string sortBy = "dateAdded", bool sortDesc = true)
     {
         var qs = $"page={page}&limit={limit}&sortBy={sortBy}&sortDesc={sortDesc}";
-        if (type != null)                         qs += $"&type={type}";
-        if (!string.IsNullOrWhiteSpace(search))   qs += $"&search={Uri.EscapeDataString(search)}";
-        if (favorites)                             qs += "&favorites=true";
+        if (type != null)                       qs += $"&type={type}";
+        if (!string.IsNullOrWhiteSpace(search)) qs += $"&search={Uri.EscapeDataString(search)}";
+        if (favorites)                          qs += "&favorites=true";
 
         var resp = await _http.GetAsync($"{ServerUrl}/api/media?{qs}");
         await EnsureSuccessAsync(resp);
@@ -172,20 +194,18 @@ public class BapalaApiService
                 new { progressSeconds },
                 JsonOpts);
         }
-        catch { /* progress save is best-effort — never crash the player */ }
+        catch { /* best-effort — never crash the player */ }
     }
 
     // ── Streaming URL ─────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns a URL the MediaElement can load directly.
-    /// JWT is embedded as ?token= because HTML video / MAUI MediaElement cannot set headers.
+    /// Returns a streaming URL with the JWT embedded as ?token=.
+    /// Uses the in-memory cached token — never touches SecureStorage here,
+    /// so this is safe to call on any thread at any time.
     /// </summary>
-    public string GetStreamUrl(int id)
-    {
-        var token = SecureStorage.GetAsync("bapala_jwt").GetAwaiter().GetResult() ?? "";
-        return $"{ServerUrl}/api/stream/{id}?token={Uri.EscapeDataString(token)}";
-    }
+    public string GetStreamUrl(int id) =>
+        $"{ServerUrl}/api/stream/{id}?token={Uri.EscapeDataString(_cachedToken ?? "")}";
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

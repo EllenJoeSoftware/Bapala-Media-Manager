@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+  <!-- Foreground layer: just the play triangle (background supplied by appicon.svg) -->
+  <polygon points="168,140 168,316 336,228" fill="#ffffff"/>
+</svg>

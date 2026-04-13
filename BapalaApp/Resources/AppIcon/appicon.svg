@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dark background matching Bapala theme -->
+  <rect width="456" height="456" fill="#0f0f0f" rx="80"/>
+  <!-- Red accent play-button triangle -->
+  <polygon points="168,140 168,316 336,228" fill="#e50914"/>
+</svg>
