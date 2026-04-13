@@ -177,19 +177,9 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
             if (folderSeasonMatch.Success && season == null)
                 season = int.Parse(folderSeasonMatch.Groups[1].Value);
 
-            // seriesName fallback: if regex never found one but we have structural
-            // markers (lesson number, season, or episode) use the containing folder name.
-            // Covers course layouts like:
-            //   <Course Name>/003 Process Injection - Part 1 - Explanation of APIs.mp4
-            if (seriesName == null && (lessonNumber != null || season != null || episode != null))
-            {
-                // Don't use generic folder names like "Season 1", "Module 2", etc.
-                var isGenericFolder = Regex.IsMatch(folderName,
-                    @"^(Season|Module|Chapter|Lesson|Part|Unit|Lecture)[ ._-]?\d*$",
-                    RegexOptions.IgnoreCase);
-                if (!isGenericFolder)
-                    seriesName = CleanTitle(folderName);
-            }
+            // seriesName fallback: use the containing folder name if regex never found one
+            if (seriesName == null)
+                seriesName = CleanTitle(folderName);
         }
 
         // ── Strip quality tags ────────────────────────────────────────────────
