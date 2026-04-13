@@ -62,8 +62,15 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
     {
         var errors = new List<string>();
         var files = new List<string>();
-        foreach (var folder in folders.Where(Directory.Exists))
+
+        var folderList = folders.ToList();
+        foreach (var folder in folderList)
         {
+            if (!Directory.Exists(folder))
+            {
+                errors.Add($"Folder not found: '{folder}'");
+                continue;
+            }
             try
             {
                 files.AddRange(
@@ -101,10 +108,13 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
                     DateAdded = DateTime.UtcNow
                 };
 
-                // Fetch TMDB metadata — best-effort, never blocks the scan
+                // Fetch TMDB metadata — best-effort with a short timeout so it never stalls the scan
                 try
                 {
-                    var meta = await tmdb.FetchMetadataAsync(parsed.Title, parsed.Year, type, ct);
+                    using var tmdbCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    tmdbCts.CancelAfter(TimeSpan.FromSeconds(5));
+
+                    var meta = await tmdb.FetchMetadataAsync(parsed.Title, parsed.Year, type, tmdbCts.Token);
                     if (meta != null)
                     {
                         item.Description = meta.Description;
@@ -115,15 +125,17 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
                         item.BackdropPath = meta.BackdropPath;
                     }
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (Exception ex) when (ex is not OperationCanceledException { CancellationToken.IsCancellationRequested: true }
+                                            || !ct.IsCancellationRequested)
                 {
-                    // metadata failure is non-critical — but honour cancellation
+                    // TMDB failure is non-critical — log but continue adding the item
+                    errors.Add($"[TMDB] {Path.GetFileName(file)}: {ex.Message}");
                 }
 
                 await repo.AddAsync(item);
                 added++;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 errors.Add($"{file}: {ex.Message}");
             }

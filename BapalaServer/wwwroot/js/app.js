@@ -397,27 +397,72 @@ document.getElementById('searchInput').addEventListener('input', e => {
 
 // ── Scan ─────────────────────────────────────────────────────────────────────
 
+// SignalR connection for real-time scan progress
+let _hubConnection = null;
+
+async function connectScanHub() {
+  if (_hubConnection) return;
+  // SignalR script loaded from CDN in index.html
+  if (typeof signalR === 'undefined') return;
+  _hubConnection = new signalR.HubConnectionBuilder()
+    .withUrl('/hubs/scan')
+    .withAutomaticReconnect()
+    .build();
+
+  _hubConnection.on('ScanStarted', data => {
+    showToast('Scan started — ' + (data.folders || []).length + ' folder(s)…', 8000);
+  });
+
+  _hubConnection.on('ScanProgress', data => {
+    const btn = document.getElementById('scanBtn');
+    if (btn) btn.textContent = `Scanning… (${data.current}/${data.total})`;
+  });
+
+  _hubConnection.on('ScanCompleted', data => {
+    const btn = document.getElementById('scanBtn');
+    if (btn) { btn.textContent = 'Scan Library'; btn.disabled = false; }
+    const errors = (data.errors || []).length;
+    const msg = `Scan done ✓  Added: ${data.added}  Skipped: ${data.skipped}` +
+      (errors > 0 ? `  Errors: ${errors}` : '');
+    showToast(msg, 6000);
+    loadMedia(); // refresh the grid
+  });
+
+  _hubConnection.on('ScanError', data => {
+    const btn = document.getElementById('scanBtn');
+    if (btn) { btn.textContent = 'Scan Library'; btn.disabled = false; }
+    showToast('Scan failed: ' + (data.error || 'Unknown error'), 8000);
+  });
+
+  try { await _hubConnection.start(); } catch { /* hub optional — scan still works */ }
+}
+
 async function triggerScan() {
   const btn = document.getElementById('scanBtn');
   btn.textContent = 'Scanning…';
   btn.disabled = true;
+  await connectScanHub();
   try {
     await API.post('/api/media/scan', {});
-    showToast('Scan started!');
+    showToast('Scan started — check progress…', 4000);
+    // Re-enable button after timeout in case SignalR isn't connected
+    setTimeout(() => {
+      if (btn.disabled) { btn.textContent = 'Scan Library'; btn.disabled = false; loadMedia(); }
+    }, 30000);
   } catch (e) {
-    showToast('Error: ' + e.message);
-  } finally {
-    setTimeout(() => { btn.textContent = 'Scan Library'; btn.disabled = false; }, 3000);
+    btn.textContent = 'Scan Library'; btn.disabled = false;
+    showToast('Scan error: ' + e.message, 5000);
   }
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
-function showToast(msg) {
+function showToast(msg, duration = 3500) {
   const t = document.getElementById('toast');
   t.textContent = msg;                               // textContent — XSS safe
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), duration);
 }
 
 loadMedia();
