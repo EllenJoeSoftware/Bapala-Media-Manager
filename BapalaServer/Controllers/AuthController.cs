@@ -11,7 +11,13 @@ public class AuthController(IJwtService jwtService, IConfiguration config) : Con
     public record LoginResponse(string Token, string ServerName);
     public record ServerInfo(string ServerName, string Version, string ApiVersion);
 
+    /// <summary>Authenticate and receive a JWT token.</summary>
+    /// <remarks>Use the returned token as a Bearer header on all other endpoints.</remarks>
+    /// <response code="200">Login successful — returns JWT + server name</response>
+    /// <response code="401">Invalid credentials</response>
     [HttpPost("login")]
+    [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult Login([FromBody] LoginRequest req)
     {
         var expectedUsername = config["Bapala:Username"] ?? "admin";
@@ -30,7 +36,10 @@ public class AuthController(IJwtService jwtService, IConfiguration config) : Con
         return Ok(new LoginResponse(token, serverName));
     }
 
+    /// <summary>Get server name and version info (no auth required).</summary>
+    /// <response code="200">Server information</response>
     [HttpGet("info")]
+    [ProducesResponseType<ServerInfo>(StatusCodes.Status200OK)]
     public IActionResult Info() =>
         Ok(new ServerInfo(
             config["Bapala:ServerName"] ?? "Bapala Server",

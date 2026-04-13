@@ -23,7 +23,14 @@ public class MediaController(
     public record WatchProgressRequest(long ProgressSeconds);
     public record BulkUpdateTypeRequest(int[] Ids, MediaType Type);
 
+    /// <summary>Add a new media item to the library.</summary>
+    /// <response code="201">Item created</response>
+    /// <response code="400">FilePath is missing</response>
+    /// <response code="409">File path already exists in the library</response>
     [HttpPost]
+    [ProducesResponseType<MediaItem>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateMediaRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.FilePath))
@@ -47,7 +54,10 @@ public class MediaController(
         return CreatedAtAction(nameof(GetById), new { id = item.Id }, item);
     }
 
+    /// <summary>List media items with filtering, search, sorting and pagination.</summary>
+    /// <response code="200">Paged list of media items</response>
     [HttpGet]
+    [ProducesResponseType<MediaListResponse>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int limit = 20,
@@ -63,14 +73,24 @@ public class MediaController(
         return Ok(new MediaListResponse(items, total, page, limit));
     }
 
+    /// <summary>Get a single media item by ID.</summary>
+    /// <response code="200">Media item</response>
+    /// <response code="404">Not found</response>
     [HttpGet("{id}")]
+    [ProducesResponseType<MediaItem>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id)
     {
         var item = await repo.GetByIdAsync(id);
         return item == null ? NotFound() : Ok(item);
     }
 
+    /// <summary>Update metadata for a media item.</summary>
+    /// <response code="200">Updated item</response>
+    /// <response code="404">Not found</response>
     [HttpPut("{id}")]
+    [ProducesResponseType<MediaItem>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMediaRequest req)
     {
         var item = await repo.GetByIdAsync(id);
@@ -85,7 +105,12 @@ public class MediaController(
         return Ok(item);
     }
 
+    /// <summary>Remove a media item from the library.</summary>
+    /// <response code="204">Deleted successfully</response>
+    /// <response code="404">Not found</response>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)
     {
         var item = await repo.GetByIdAsync(id);
@@ -94,7 +119,10 @@ public class MediaController(
         return NoContent();
     }
 
+    /// <summary>Toggle the favourite flag on a media item.</summary>
+    /// <response code="200">Updated item</response>
     [HttpPost("{id}/favorite")]
+    [ProducesResponseType<MediaItem>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ToggleFavorite(int id)
     {
         var item = await repo.GetByIdAsync(id);
@@ -104,7 +132,10 @@ public class MediaController(
         return Ok(new { item.IsFavorite });
     }
 
+    /// <summary>Save the current watch position (in seconds).</summary>
+    /// <response code="204">Saved</response>
     [HttpPost("{id}/progress")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> SaveProgress(int id, [FromBody] WatchProgressRequest req)
     {
         var item = await repo.GetByIdAsync(id);
@@ -113,7 +144,10 @@ public class MediaController(
         return NoContent();
     }
 
+    /// <summary>Get the saved watch position for a media item.</summary>
+    /// <response code="200">Progress in seconds</response>
     [HttpGet("{id}/progress")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProgress(int id)
     {
         var history = await repo.GetWatchHistoryAsync(id);
@@ -121,7 +155,10 @@ public class MediaController(
     }
 
     // ── Bulk section/type change ──────────────────────────────────────────────
+    /// <summary>Change the media type for multiple items at once.</summary>
+    /// <response code="204">Updated successfully</response>
     [HttpPost("bulk-type")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> BulkUpdateType([FromBody] BulkUpdateTypeRequest req)
     {
         if (req.Ids == null || req.Ids.Length == 0)
@@ -177,7 +214,10 @@ public class MediaController(
     }
 
     // ── Library scan ─────────────────────────────────────────────────────────
+    /// <summary>Trigger a library scan of the configured media folders.</summary>
+    /// <response code="200">Scan started</response>
     [HttpPost("scan")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult TriggerScan()
     {
         var folders = config.GetSection("Bapala:MediaFolders").Get<string[]>() ?? [];

@@ -1,3 +1,4 @@
+using Scalar.AspNetCore;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +65,31 @@ builder.Services.AddCors(opt => opt.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddHttpClient();
 
+// OpenAPI / Swagger
+builder.Services.AddOpenApi(opt =>
+{
+    opt.AddDocumentTransformer((doc, ctx, ct) =>
+    {
+        doc.Info = new Microsoft.OpenApi.Models.OpenApiInfo
+        {
+            Title       = "Bapala Media Server API",
+            Version     = "v1",
+            Description = "REST API for the Bapala home media server. " +
+                          "All /api/media and /api/stream endpoints require a Bearer JWT. " +
+                          "Obtain a token via POST /api/auth/login."
+        };
+        doc.Components ??= new();
+        doc.Components.SecuritySchemes["Bearer"] = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        {
+            Type        = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+            Scheme      = "bearer",
+            BearerFormat = "JWT",
+            Description = "Enter your JWT token (without the 'Bearer ' prefix)"
+        };
+        return Task.CompletedTask;
+    });
+});
+
 // Listen on configured port
 var port = builder.Configuration.GetValue<int>("Bapala:Port", 8484);
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
@@ -99,6 +125,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<BapalaServer.Hubs.ScanProgressHub>("/hubs/scan");
+
+// OpenAPI JSON endpoint + Scalar UI (available in development and production)
+app.MapOpenApi();  // → /openapi/v1.json
+app.MapScalarApiReference(opt =>
+{
+    opt.Title = "Bapala API";
+    opt.Theme = ScalarTheme.DeepSpace;
+    opt.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
+    opt.Authentication = new ScalarAuthenticationOptions
+    {
+        PreferredSecurityScheme = "Bearer"
+    };
+});  // → /scalar/v1
 
 app.Run();
 
