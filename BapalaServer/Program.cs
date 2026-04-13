@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using Microsoft.OpenApi.Models;
 using BapalaServer.Data;
 using BapalaServer.Repositories;
 using BapalaServer.Services;
