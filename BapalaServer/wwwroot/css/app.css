@@ -155,3 +155,12 @@ body.select-mode .card-check { display: flex; }
 .tmdb-pending { color: var(--text2); }
 .tmdb-ok      { color: #4caf50; }
 .tmdb-fail    { color: var(--accent); }
+
+/* ── Sort bar ────────────────────────────────────────────────────────────── */
+.sort-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 24px; background: var(--surface); border-bottom: 1px solid #2a2a2a;
+  font-size: .85rem;
+}
+.sort-label { color: var(--text2); font-size: .8rem; margin-right: 4px; }
+.sort-bar .filter-btn { border-radius: 6px; font-size: .8rem; padding: 5px 12px; }

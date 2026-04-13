@@ -7,7 +7,8 @@ namespace BapalaServer.Repositories;
 public class SqliteMediaRepository(BapalaDbContext db) : IMediaRepository
 {
     public async Task<IEnumerable<MediaItem>> GetAllAsync(
-        int page, int limit, MediaType? type, string? genre, string? search, bool favoritesOnly)
+        int page, int limit, MediaType? type, string? genre, string? search, bool favoritesOnly,
+        string sortBy = "dateAdded", bool sortDesc = true)
     {
         var q = db.MediaItems.AsQueryable();
         if (type.HasValue) q = q.Where(m => m.Type == type.Value);
@@ -20,9 +21,21 @@ public class SqliteMediaRepository(BapalaDbContext db) : IMediaRepository
         if (!string.IsNullOrWhiteSpace(search))
             q = q.Where(m => EF.Functions.Like(m.Title, $"%{search}%"));
         if (favoritesOnly) q = q.Where(m => m.IsFavorite);
-        return await q.OrderByDescending(m => m.DateAdded)
-                      .Skip((page - 1) * limit).Take(limit)
-                      .ToListAsync();
+
+        q = (sortBy.ToLowerInvariant(), sortDesc) switch
+        {
+            ("title",     false) => q.OrderBy(m => m.Title),
+            ("title",     true)  => q.OrderByDescending(m => m.Title),
+            ("year",      false) => q.OrderBy(m => m.Year ?? 0),
+            ("year",      true)  => q.OrderByDescending(m => m.Year ?? 0),
+            ("rating",    false) => q.OrderBy(m => m.Rating ?? 0),
+            ("rating",    true)  => q.OrderByDescending(m => m.Rating ?? 0),
+            _                    => sortDesc
+                                      ? q.OrderByDescending(m => m.DateAdded)
+                                      : q.OrderBy(m => m.DateAdded),
+        };
+
+        return await q.Skip((page - 1) * limit).Take(limit).ToListAsync();
     }
 
     public async Task<int> CountAsync(MediaType? type, string? genre, string? search, bool favoritesOnly)
@@ -64,11 +77,7 @@ public class SqliteMediaRepository(BapalaDbContext db) : IMediaRepository
     public async Task DeleteAsync(int id)
     {
         var item = await db.MediaItems.FindAsync(id);
-        if (item != null)
-        {
-            db.MediaItems.Remove(item);
-            await db.SaveChangesAsync();
-        }
+        if (item != null) { db.MediaItems.Remove(item); await db.SaveChangesAsync(); }
     }
 
     public Task<WatchHistory?> GetWatchHistoryAsync(int mediaItemId) =>

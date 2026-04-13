@@ -1,4 +1,4 @@
-let state = { page: 1, limit: 20, type: null, genre: null, search: '', favorites: false, total: 0, viewMode: 'grid' };
+let state = { page: 1, limit: 20, type: null, genre: null, search: '', favorites: false, total: 0, viewMode: 'grid', sortBy: 'dateAdded', sortDesc: true };
 let editingId = null;
 let selectMode = false;
 let selectedIds = new Set();
@@ -18,6 +18,8 @@ async function loadMedia() {
   if (state.genre)     params.set('genre', state.genre);
   if (state.search)    params.set('search', state.search);
   if (state.favorites) params.set('favorites', 'true');
+  params.set('sortBy', state.sortBy);
+  params.set('sortDesc', state.sortDesc);
 
   try {
     const data = await API.get('/api/media?' + params);
@@ -25,6 +27,7 @@ async function loadMedia() {
     renderMedia(data.items);
     renderPagination();
     syncAllBtn();
+    syncSortButtons();
   } catch {
     grid.textContent = '';
     const msg = document.createElement('div');
@@ -505,6 +508,34 @@ document.getElementById('searchInput').addEventListener('input', e => {
   clearTimeout(window._searchTimer);
   window._searchTimer = setTimeout(loadMedia, 400);
 });
+
+
+// ── Sort ─────────────────────────────────────────────────────────────────────
+
+function setSort(field) {
+  if (state.sortBy === field) {
+    state.sortDesc = !state.sortDesc; // toggle direction if same field
+  } else {
+    state.sortBy = field;
+    state.sortDesc = field === 'dateAdded'; // date desc by default, others asc
+  }
+  state.page = 1;
+  syncSortButtons();
+  loadMedia();
+}
+
+function syncSortButtons() {
+  const fields = ['dateAdded', 'title', 'year', 'rating'];
+  fields.forEach(f => {
+    const btn = document.getElementById('sort_' + f);
+    if (!btn) return;
+    const active = state.sortBy === f;
+    btn.classList.toggle('active', active);
+    const arrow = active ? (state.sortDesc ? ' ↓' : ' ↑') : '';
+    btn.dataset.label = btn.dataset.label || btn.textContent.replace(/ [↑↓]$/, '');
+    btn.textContent = btn.dataset.label + arrow;
+  });
+}
 
 // ── Scan ─────────────────────────────────────────────────────────────────────
 

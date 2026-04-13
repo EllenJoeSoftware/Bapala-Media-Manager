@@ -29,6 +29,16 @@
   <button class="filter-btn" id="viewBtn"    onclick="toggleView()">☰ List</button>
 </div>
 
+
+<!-- Sort bar -->
+<div class="sort-bar">
+  <span class="sort-label">Sort:</span>
+  <button class="filter-btn active" id="sort_dateAdded" data-label="Date Added" onclick="setSort('dateAdded')">Date Added ↓</button>
+  <button class="filter-btn" id="sort_title"     data-label="Name"       onclick="setSort('title')">Name</button>
+  <button class="filter-btn" id="sort_year"      data-label="Year"       onclick="setSort('year')">Year</button>
+  <button class="filter-btn" id="sort_rating"    data-label="Rating"     onclick="setSort('rating')">Rating</button>
+</div>
+
 <!-- Bulk action bar (visible only in select mode) -->
 <div class="bulk-bar" id="bulkBar" style="display:none">
   <span id="bulkCount">0 selected</span>

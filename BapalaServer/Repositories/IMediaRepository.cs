@@ -5,7 +5,8 @@ namespace BapalaServer.Repositories;
 public interface IMediaRepository
 {
     Task<IEnumerable<MediaItem>> GetAllAsync(
-        int page, int limit, MediaType? type, string? genre, string? search, bool favoritesOnly);
+        int page, int limit, MediaType? type, string? genre, string? search, bool favoritesOnly,
+        string sortBy = "dateAdded", bool sortDesc = true);
     Task<int> CountAsync(MediaType? type, string? genre, string? search, bool favoritesOnly);
     Task<MediaItem?> GetByIdAsync(int id);
     Task<MediaItem?> GetByFilePathAsync(string filePath);

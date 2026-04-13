@@ -54,9 +54,11 @@ public class MediaController(
         [FromQuery] MediaType? type = null,
         [FromQuery] string? genre = null,
         [FromQuery] string? search = null,
-        [FromQuery] bool favorites = false)
+        [FromQuery] bool favorites = false,
+        [FromQuery] string sortBy = "dateAdded",
+        [FromQuery] bool sortDesc = true)
     {
-        var items = await repo.GetAllAsync(page, limit, type, genre, search, favorites);
+        var items = await repo.GetAllAsync(page, limit, type, genre, search, favorites, sortBy, sortDesc);
         var total = await repo.CountAsync(type, genre, search, favorites);
         return Ok(new MediaListResponse(items, total, page, limit));
     }
