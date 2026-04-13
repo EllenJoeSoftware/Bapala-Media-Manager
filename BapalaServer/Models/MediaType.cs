@@ -5,5 +5,6 @@ public enum MediaType
     Movie,
     Series,
     Documentary,
-    Education
+    Education,
+    MusicVideo
 }
