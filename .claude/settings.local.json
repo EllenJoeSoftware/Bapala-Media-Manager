@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc --track-changes=all \"F:/2026/code/repos/Bapala Media Manager/Readme.docx\" -o \"F:/2026/code/repos/Bapala Media Manager/readme_extracted.md\")",
+      "Bash(python -c ':*)"
+    ]
+  }
+}

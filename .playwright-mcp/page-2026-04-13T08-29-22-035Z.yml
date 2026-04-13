@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "Bapala" [ref=e3] [cursor=pointer]:
+      - /url: /index.html
+    - link "Library" [ref=e4] [cursor=pointer]:
+      - /url: /index.html
+    - link "Settings" [ref=e5] [cursor=pointer]:
+      - /url: /settings.html
+    - searchbox "Search" [ref=e6]
+  - generic [ref=e7]:
+    - button "Movies" [ref=e8] [cursor=pointer]
+    - button "Series" [ref=e9] [cursor=pointer]
+    - button "Docs" [ref=e10] [cursor=pointer]
+    - button "Favorites" [ref=e11] [cursor=pointer]
+    - button "Scan Library" [ref=e12] [cursor=pointer]
+    - button "☰ List" [ref=e13] [cursor=pointer]
+  - list [ref=e14]:
+    - generic [ref=e15]: Loading…

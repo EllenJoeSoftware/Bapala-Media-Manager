@@ -1,0 +1,59 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "Bapala" [ref=e3] [cursor=pointer]:
+      - /url: /index.html
+    - link "Library" [ref=e4] [cursor=pointer]:
+      - /url: /index.html
+    - link "Settings" [ref=e5] [cursor=pointer]:
+      - /url: /settings.html
+    - searchbox "Search" [ref=e6]
+  - generic [ref=e7]:
+    - button "Movies" [ref=e8] [cursor=pointer]
+    - button "Series" [ref=e9] [cursor=pointer]
+    - button "Docs" [ref=e10] [cursor=pointer]
+    - button "Favorites" [ref=e11] [cursor=pointer]
+    - button "Scan Library" [ref=e12] [cursor=pointer]
+    - button "⊞ Grid" [ref=e38] [cursor=pointer]
+  - list [ref=e14]:
+    - table [ref=e106]:
+      - rowgroup [ref=e107]:
+        - row "Title Type Year Genres Rating Actions" [ref=e108]:
+          - columnheader "Title" [ref=e109]
+          - columnheader "Type" [ref=e110]
+          - columnheader "Year" [ref=e111]
+          - columnheader "Genres" [ref=e112]
+          - columnheader "Rating" [ref=e113]
+          - columnheader "Actions" [ref=e114]
+      - rowgroup [ref=e115]:
+        - row "Inception Documentary 2010 Action,Sci-Fi,Thriller 8.8 ▶ Play ✏ Edit" [ref=e116]:
+          - cell "Inception" [ref=e117]
+          - cell "Documentary" [ref=e118]
+          - cell "2010" [ref=e119]
+          - cell "Action,Sci-Fi,Thriller" [ref=e120]
+          - cell "8.8" [ref=e121]
+          - cell "▶ Play ✏ Edit" [ref=e122]:
+            - button "▶ Play" [ref=e123] [cursor=pointer]
+            - button "✏ Edit" [ref=e124] [cursor=pointer]
+        - row "Breaking Bad Series 2008 Drama,Crime,Thriller 9.5 ▶ Play ✏ Edit" [ref=e125]:
+          - cell "Breaking Bad" [ref=e126]
+          - cell "Series" [ref=e127]
+          - cell "2008" [ref=e128]
+          - cell "Drama,Crime,Thriller" [ref=e129]
+          - cell "9.5" [ref=e130]
+          - cell "▶ Play ✏ Edit" [ref=e131]:
+            - button "▶ Play" [ref=e132] [cursor=pointer]
+            - button "✏ Edit" [ref=e133] [cursor=pointer]
+        - row "Planet Earth Documentary 2006 Nature,Documentary 9.4 ▶ Play ✏ Edit" [ref=e134]:
+          - cell "Planet Earth" [ref=e135]
+          - cell "Documentary" [ref=e136]
+          - cell "2006" [ref=e137]
+          - cell "Nature,Documentary" [ref=e138]
+          - cell "9.4" [ref=e139]
+          - cell "▶ Play ✏ Edit" [ref=e140]:
+            - button "▶ Play" [ref=e141] [cursor=pointer]
+            - button "✏ Edit" [ref=e142] [cursor=pointer]
+  - generic [ref=e34]:
+    - button "← Prev" [disabled] [ref=e143]
+    - generic [ref=e144]: 1 / 1 (3 items)
+    - button "Next →" [disabled] [ref=e145]
+  - status [ref=e146]: Media updated.

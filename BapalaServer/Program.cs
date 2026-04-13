@@ -8,9 +8,14 @@ using BapalaServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database
+// Database — use an absolute path so the same file is used regardless of
+// working directory (dotnet run vs running the compiled exe from bin/).
+var dbRelative = builder.Configuration.GetConnectionString("Default") ?? "Data Source=bapala.db";
+var dbFileName = dbRelative.Replace("Data Source=", "").Trim();
+if (!Path.IsPathRooted(dbFileName))
+    dbFileName = Path.Combine(builder.Environment.ContentRootPath, dbFileName);
 builder.Services.AddDbContext<BapalaDbContext>(opt =>
-    opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=bapala.db"));
+    opt.UseSqlite($"Data Source={dbFileName}"));
 
 // Auth
 var jwtSecret = builder.Configuration["Jwt:Secret"]!;
@@ -50,7 +55,10 @@ builder.Services.AddSingleton<IMdnsService>(p => p.GetRequiredService<MdnsServic
 builder.Services.AddHostedService(p => p.GetRequiredService<MdnsService>());
 
 // ASP.NET Core
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+        opt.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSignalR();
 builder.Services.AddCors(opt => opt.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
@@ -76,7 +84,16 @@ var defaultFiles = new DefaultFilesOptions();
 defaultFiles.DefaultFileNames.Clear();
 defaultFiles.DefaultFileNames.Add("login.html");
 app.UseDefaultFiles(defaultFiles);
-app.UseStaticFiles();
+// Force revalidation of JS/CSS so browsers never silently serve stale script files
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var ext = Path.GetExtension(ctx.File.Name).ToLowerInvariant();
+        if (ext is ".js" or ".css" or ".html")
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache";
+    }
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

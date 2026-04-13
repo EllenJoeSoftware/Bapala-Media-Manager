@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bapala",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "BapalaServer"],
+      "port": 8484
+    }
+  ]
+}

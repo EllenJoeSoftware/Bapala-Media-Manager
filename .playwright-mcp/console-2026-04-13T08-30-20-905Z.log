@@ -1,0 +1,2 @@
+[   13117ms] ReferenceError: toggleView is not defined
+    at HTMLButtonElement.onclick (http://localhost:8484/index.html?v=3:24:67)

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bapala</title>
-  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/app.css?v=3">
 </head>
 <body>
 <nav>
@@ -15,17 +15,105 @@
   <input type="search" id="searchInput" placeholder="Search titles…" aria-label="Search">
 </nav>
 <div class="filters">
-  <button class="filter-btn" data-type="Movie"       onclick="setFilter('Movie')">Movies</button>
-  <button class="filter-btn" data-type="Series"      onclick="setFilter('Series')">Series</button>
-  <button class="filter-btn" data-type="Documentary" onclick="setFilter('Documentary')">Docs</button>
-  <button class="filter-btn" id="favBtn"             onclick="toggleFavorites()">Favorites</button>
+  <button class="filter-btn active" id="allBtn"          onclick="clearFilters()">All</button>
+  <button class="filter-btn" data-type="Movie"           onclick="setFilter('Movie')">Movies</button>
+  <button class="filter-btn" data-type="Series"          onclick="setFilter('Series')">Series</button>
+  <button class="filter-btn" data-type="Documentary"     onclick="setFilter('Documentary')">Docs</button>
+  <button class="filter-btn" id="favBtn"                 onclick="toggleFavorites()">Favorites</button>
   <div class="spacer" style="flex:1"></div>
-  <button class="filter-btn" id="scanBtn"            onclick="triggerScan()">Scan Library</button>
+  <button class="filter-btn" id="addBtn"   onclick="openAddModal()">+ Add</button>
+  <button class="filter-btn" id="scanBtn"  onclick="triggerScan()">Scan Library</button>
+  <button class="filter-btn" id="viewBtn"  onclick="toggleView()">☰ List</button>
 </div>
 <div class="grid" id="grid" role="list"></div>
 <div class="pagination" id="pagination"></div>
 <div class="toast" id="toast" role="status"></div>
-<script src="/js/api.js"></script>
-<script src="/js/app.js"></script>
+
+<!-- ── Edit / Classify modal ─────────────────────────────────────────────── -->
+<dialog id="editModal" class="edit-modal">
+  <div class="modal-header">
+    <span class="modal-title">Edit / Classify Media</span>
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-group">
+      <label for="eTitle">Title</label>
+      <input id="eTitle" class="text-input" type="text">
+    </div>
+    <div class="modal-row">
+      <div class="form-group">
+        <label for="eType">Type</label>
+        <select id="eType" class="text-input">
+          <option value="Movie">Movie</option>
+          <option value="Series">Series</option>
+          <option value="Documentary">Documentary</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="eYear">Year</label>
+        <input id="eYear" class="text-input" type="number" min="1900" max="2099">
+      </div>
+      <div class="form-group">
+        <label for="eRating">Rating <small>0 – 10</small></label>
+        <input id="eRating" class="text-input" type="number" min="0" max="10" step="0.1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="eGenres">Genres <small>comma-separated</small></label>
+      <input id="eGenres" class="text-input" type="text" placeholder="Action, Thriller">
+    </div>
+    <div class="form-group">
+      <label for="eDesc">Description</label>
+      <textarea id="eDesc" class="text-input" rows="4" style="resize:vertical"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="filter-btn btn-danger" onclick="deleteMedia()" title="Remove from library (file stays on disk)">🗑 Delete</button>
+    <div class="spacer"></div>
+    <button class="filter-btn" onclick="closeEditModal()">Cancel</button>
+    <button class="btn modal-save-btn" onclick="saveMedia()">Save Changes</button>
+  </div>
+</dialog>
+
+<!-- ── Add Media modal ───────────────────────────────────────────────────── -->
+<dialog id="addModal" class="edit-modal">
+  <div class="modal-header">
+    <span class="modal-title">Add Media to Library</span>
+    <button class="modal-close" onclick="closeAddModal()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-group">
+      <label for="aFilePath">File Path <small>(required)</small></label>
+      <input id="aFilePath" class="text-input" type="text"
+             placeholder="C:\Movies\film.mkv" oninput="autofillTitle()">
+    </div>
+    <div class="form-group">
+      <label for="aTitle">Title <small>(auto-filled from filename)</small></label>
+      <input id="aTitle" class="text-input" type="text">
+    </div>
+    <div class="modal-row">
+      <div class="form-group">
+        <label for="aType">Type</label>
+        <select id="aType" class="text-input">
+          <option value="Movie">Movie</option>
+          <option value="Series">Series</option>
+          <option value="Documentary">Documentary</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="aYear">Year <small>(optional)</small></label>
+        <input id="aYear" class="text-input" type="number" min="1900" max="2099">
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <div class="spacer"></div>
+    <button class="filter-btn" onclick="closeAddModal()">Cancel</button>
+    <button class="btn modal-save-btn" onclick="saveNewMedia()">Add to Library</button>
+  </div>
+</dialog>
+
+<script src="/js/api.js?v=3"></script>
+<script src="/js/app.js?v=3"></script>
 </body>
 </html>

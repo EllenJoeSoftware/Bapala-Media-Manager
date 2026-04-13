@@ -46,18 +46,29 @@ function renderFolders() {
   });
 }
 
-function addFolder() {
-  const val = document.getElementById('newFolder').value.trim();
+async function addFolder() {
+  const input = document.getElementById('newFolder');
+  const val = input.value.trim();
   if (!val) return;
   settings.mediaFolders = settings.mediaFolders || [];
   settings.mediaFolders.push(val);
-  document.getElementById('newFolder').value = '';
+  input.value = '';
   renderFolders();
+  await saveFolders();
 }
 
-function removeFolder(f) {
+async function removeFolder(f) {
   settings.mediaFolders = settings.mediaFolders.filter(x => x !== f);
   renderFolders();
+  await saveFolders();
+}
+
+// Save only the media folders list (called automatically on add/remove)
+async function saveFolders() {
+  try {
+    await API.put('/api/settings', { mediaFolders: settings.mediaFolders });
+    showToast('Folder list saved.');
+  } catch { showToast('Save failed.'); }
 }
 
 async function saveSettings() {
@@ -66,7 +77,9 @@ async function saveSettings() {
       mediaFolders: settings.mediaFolders,
       tmdbApiKey: document.getElementById('tmdbKey').value || undefined
     });
-    showToast('Saved. Restart the server to apply changes.');
+    document.getElementById('tmdbKey').value = '';  // clear — don't leave key on screen
+    showToast('Settings saved.');
+    await load();   // refresh Server Info so TMDB status updates immediately
   } catch { showToast('Save failed.'); }
 }
 

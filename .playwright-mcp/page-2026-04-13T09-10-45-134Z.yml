@@ -1,0 +1,31 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "Bapala" [ref=e3] [cursor=pointer]:
+      - /url: /index.html
+    - link "Library" [ref=e4] [cursor=pointer]:
+      - /url: /index.html
+    - link "Settings" [ref=e5] [cursor=pointer]:
+      - /url: /settings.html
+    - button "Sign Out" [ref=e6] [cursor=pointer]
+  - generic [ref=e7]:
+    - heading "Settings" [level=1] [ref=e8]
+    - generic [ref=e9]:
+      - heading "Media Folders" [level=2] [ref=e10]
+      - list [ref=e11]:
+        - listitem [ref=e12]:
+          - generic [ref=e13]: F:\Downloads\completed
+          - button "Remove" [ref=e14] [cursor=pointer]
+      - generic [ref=e15]:
+        - textbox "C:\\Movies" [ref=e16]
+        - button "Add" [ref=e17] [cursor=pointer]
+    - generic [ref=e18]:
+      - heading "TMDB API Key" [level=2] [ref=e19]
+      - textbox "Get a free key at themoviedb.org" [ref=e20]
+      - button "Save" [ref=e21] [cursor=pointer]
+    - generic [ref=e22]:
+      - heading "Server Info" [level=2] [ref=e23]
+      - generic [ref=e24]:
+        - generic [ref=e25]: "Server: My Bapala Server"
+        - generic [ref=e26]: "Port: 8484"
+        - generic [ref=e27]: "TMDB: Configured"
+        - generic [ref=e28]: "User: admin"

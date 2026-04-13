@@ -55,7 +55,66 @@ nav input { background: var(--surface2); border: 1px solid #333; color: var(--te
 .folder-list li button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: .85rem; }
 .text-input { width: 100%; background: var(--surface2); border: 1px solid #333; color: var(--text); padding: 10px 12px; border-radius: 4px; font-size: .9rem; }
 
+/* ── Card edit overlay ──────────────────────────────────────────── */
+.card { position: relative; }
+.card-edit {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,0,0,.75); border: none; color: #fff;
+  border-radius: 4px; padding: 4px 8px; font-size: .75rem;
+  cursor: pointer; opacity: 0; transition: opacity .15s; z-index: 2;
+}
+.card:hover .card-edit { opacity: 1; }
+
+/* ── List / table view ──────────────────────────────────────────── */
+.media-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.media-table th { text-align: left; padding: 10px 12px; color: var(--text2); font-weight: 600; border-bottom: 1px solid #333; white-space: nowrap; }
+.media-table td { padding: 10px 12px; border-bottom: 1px solid #222; vertical-align: middle; }
+.media-table tr:hover td { background: var(--surface2); }
+.cell-title { font-weight: 500; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell-genres { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text2); font-size: .8rem; }
+.cell-actions { display: flex; gap: 6px; white-space: nowrap; }
+.cell-actions .filter-btn { padding: 4px 10px; font-size: .8rem; }
+#grid.list-mode { display: block; padding: 0 24px 32px; }
+
+/* ── Edit modal ─────────────────────────────────────────────────── */
+.edit-modal {
+  background: var(--surface); color: var(--text); border: 1px solid #333;
+  border-radius: 10px; padding: 0; width: min(600px, 96vw); max-height: 90vh;
+  overflow-y: auto;
+}
+.edit-modal::backdrop { background: rgba(0,0,0,.7); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #333; }
+.modal-title { font-size: 1rem; font-weight: 600; }
+.modal-close { background: none; border: none; color: var(--text2); font-size: 1.1rem; cursor: pointer; line-height: 1; }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.modal-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.modal-body .form-group { display: flex; flex-direction: column; gap: 6px; }
+.modal-body label { font-size: .8rem; color: var(--text2); }
+.modal-body small { font-size: .75rem; color: var(--text2); }
+.modal-body textarea.text-input { font-family: inherit; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid #333; }
+.modal-save-btn { width: auto; padding: 8px 24px; font-size: .9rem; }
+
 .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid #444; padding: 12px 20px; border-radius: 6px; font-size: .9rem; display: none; z-index: 999; }
 .toast.show { display: block; animation: fadeIn .25s; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; } }
 .spinner { text-align: center; padding: 60px; color: var(--text2); font-size: .9rem; }
+
+/* ── Danger / delete button ──────────────────────────────────────────────── */
+.btn-danger { background: #5a0000; border-color: #7a0000; color: #e5e5e5; }
+.btn-danger:hover { background: #7a0000; border-color: #900; }
+
+/* ── Card: favorite overlay button (top-left on hover) ──────────────────── */
+.card-fav {
+  position: absolute; top: 8px; left: 8px;
+  background: rgba(0,0,0,.75); border: none; color: var(--text2);
+  border-radius: 4px; padding: 4px 8px; font-size: .8rem;
+  cursor: pointer; opacity: 0; transition: opacity .15s; z-index: 2;
+}
+.card:hover .card-fav { opacity: 1; }
+.card-fav.fav-active { color: var(--accent); }
+
+/* ── Edit modal: delete button sits left, save/cancel right ─────────────── */
+.modal-footer { justify-content: flex-start; }
+.modal-footer .spacer { flex: 1; }

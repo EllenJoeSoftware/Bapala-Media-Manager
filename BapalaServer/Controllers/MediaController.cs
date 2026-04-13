@@ -18,8 +18,33 @@ public class MediaController(
     IConfiguration config) : ControllerBase
 {
     public record MediaListResponse(IEnumerable<MediaItem> Items, int Total, int Page, int Limit);
-    public record UpdateMediaRequest(string? Title, int? Year, string? Description, string? Genres, double? Rating);
+    public record CreateMediaRequest(string FilePath, string? Title, MediaType Type, int? Year);
+    public record UpdateMediaRequest(string? Title, int? Year, string? Description, string? Genres, double? Rating, MediaType? Type);
     public record WatchProgressRequest(long ProgressSeconds);
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateMediaRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.FilePath))
+            return BadRequest(new { error = "FilePath is required." });
+
+        var existing = await repo.GetByFilePathAsync(req.FilePath);
+        if (existing != null)
+            return Conflict(new { error = "An entry with this file path already exists." });
+
+        var item = new MediaItem
+        {
+            FilePath = req.FilePath,
+            Title = string.IsNullOrWhiteSpace(req.Title)
+                ? Path.GetFileNameWithoutExtension(req.FilePath)
+                : req.Title,
+            Type = req.Type,
+            Year = req.Year,
+            DateAdded = DateTime.UtcNow
+        };
+        await repo.AddAsync(item);
+        return CreatedAtAction(nameof(GetById), new { id = item.Id }, item);
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll(
@@ -52,6 +77,7 @@ public class MediaController(
         if (req.Description != null) item.Description = req.Description;
         if (req.Genres != null) item.Genres = req.Genres;
         if (req.Rating.HasValue) item.Rating = req.Rating;
+        if (req.Type.HasValue) item.Type = req.Type.Value;
         await repo.UpdateAsync(item);
         return Ok(item);
     }
@@ -94,8 +120,7 @@ public class MediaController(
     [HttpPost("scan")]
     public IActionResult TriggerScan()
     {
-        var foldersRaw = config["Bapala:MediaFolders"] ?? "";
-        var folders = foldersRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var folders = config.GetSection("Bapala:MediaFolders").Get<string[]>() ?? [];
         if (folders.Length == 0)
             return BadRequest(new { error = "No media folders configured. Add them in Settings." });
 

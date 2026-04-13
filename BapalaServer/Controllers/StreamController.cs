@@ -40,9 +40,7 @@ public class StreamController(IMediaRepository repo, IConfiguration config) : Co
             return NotFound(new { error = "File not found on disk" });
 
         // Confine streaming to configured media folders to prevent path traversal
-        var foldersRaw = config["Bapala:MediaFolders"] ?? "";
-        var allowedFolders = foldersRaw
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        var allowedFolders = (config.GetSection("Bapala:MediaFolders").Get<string[]>() ?? [])
             .Select(f => Path.GetFullPath(f))
             .ToList();
         var fullPath = Path.GetFullPath(item.FilePath);

@@ -1,0 +1,40 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "Bapala" [ref=e3] [cursor=pointer]:
+      - /url: /index.html
+    - link "Library" [ref=e4] [cursor=pointer]:
+      - /url: /index.html
+    - link "Settings" [ref=e5] [cursor=pointer]:
+      - /url: /settings.html
+    - searchbox "Search" [ref=e6]
+  - generic [ref=e7]:
+    - button "Movies" [ref=e8] [cursor=pointer]
+    - button "Series" [ref=e9] [cursor=pointer]
+    - button "Docs" [ref=e10] [cursor=pointer]
+    - button "Favorites" [ref=e11] [cursor=pointer]
+    - button "Scan Library" [ref=e12] [cursor=pointer]
+    - button "☰ List" [ref=e13] [cursor=pointer]
+  - list [ref=e14]:
+    - listitem [ref=e15] [cursor=pointer]:
+      - img "Inception" [ref=e16]
+      - button "✏" [ref=e17]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Inception
+        - generic [ref=e20]: 2010 · Movie
+    - listitem [ref=e21] [cursor=pointer]:
+      - img "Breaking Bad" [ref=e22]
+      - button "✏" [ref=e23]
+      - generic [ref=e24]:
+        - generic [ref=e25]: Breaking Bad
+        - generic [ref=e26]: 2008 · Series
+        - generic [ref=e27]: Favorite
+    - listitem [ref=e28] [cursor=pointer]:
+      - img "Planet Earth" [ref=e29]
+      - button "✏" [ref=e30]
+      - generic [ref=e31]:
+        - generic [ref=e32]: Planet Earth
+        - generic [ref=e33]: 2006 · Documentary
+  - generic [ref=e34]:
+    - button "← Prev" [disabled] [ref=e35]
+    - generic [ref=e36]: 1 / 1 (3 items)
+    - button "Next →" [disabled] [ref=e37]
