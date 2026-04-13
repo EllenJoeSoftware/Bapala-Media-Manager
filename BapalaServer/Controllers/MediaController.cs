@@ -13,9 +13,9 @@ namespace BapalaServer.Controllers;
 [Authorize]
 public class MediaController(
     IMediaRepository repo,
-    IMediaScannerService scanner,
     IHubContext<ScanProgressHub> hub,
-    IConfiguration config) : ControllerBase
+    IConfiguration config,
+    IServiceScopeFactory scopeFactory) : ControllerBase
 {
     public record MediaListResponse(IEnumerable<MediaItem> Items, int Total, int Page, int Limit);
     public record CreateMediaRequest(string FilePath, string? Title, MediaType Type, int? Year);
@@ -124,6 +124,8 @@ public class MediaController(
         if (folders.Length == 0)
             return BadRequest(new { error = "No media folders configured. Add them in Settings." });
 
+        // Capture scopeFactory — do NOT capture any scoped services (repo, scanner) here.
+        // They will be disposed when the request ends, before the background task completes.
         _ = Task.Run(async () =>
         {
             await hub.Clients.All.SendAsync("ScanStarted", new { folders });
@@ -131,6 +133,9 @@ public class MediaController(
                 hub.Clients.All.SendAsync("ScanProgress", p));
             try
             {
+                // Create a fresh DI scope that lives for the entire background scan.
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var scanner = scope.ServiceProvider.GetRequiredService<IMediaScannerService>();
                 var result = await scanner.ScanFoldersAsync(folders, progress);
                 await hub.Clients.All.SendAsync("ScanCompleted", result);
             }
