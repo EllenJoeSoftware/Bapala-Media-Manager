@@ -1,4 +1,4 @@
-// ── Persisted preferences (survive page refresh) ─────────────────────────────
+// ── Persisted preferences ─────────────────────────────────────────────────────
 function loadPrefs() {
   try { return JSON.parse(localStorage.getItem('bapala_prefs') || '{}'); } catch { return {}; }
 }
@@ -14,25 +14,47 @@ function savePrefs() {
 const _prefs = loadPrefs();
 let state = {
   page: 1, limit: 20,
-  type:     _prefs.type     ?? null,
+  type:       _prefs.type     ?? null,
   genre: null, search: '', favorites: false, total: 0,
-  viewMode: _prefs.viewMode ?? 'grid',
-  sortBy:   _prefs.sortBy   ?? 'dateAdded',
-  sortDesc: _prefs.sortDesc ?? true,
+  viewMode:   _prefs.viewMode ?? 'grid',
+  sortBy:     _prefs.sortBy   ?? 'dateAdded',
+  sortDesc:   _prefs.sortDesc ?? true,
+  // series/course drill-down
+  drillGroup: null,   // { name, type } — null means top-level
 };
 let editingId = null;
 let selectMode = false;
 let selectedIds = new Set();
 
-// ── Data loading ─────────────────────────────────────────────────────────────
+// ── Types that support grouping ───────────────────────────────────────────────
+const GROUPED_TYPES = ['Series', 'Education'];
+
+function isGroupedView() {
+  return GROUPED_TYPES.includes(state.type) && !state.drillGroup && !state.search;
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
 
 async function loadMedia() {
+  // If we're in a grouped section (Series / Education) and not drilling down,
+  // load the groups shelf instead of individual items.
+  if (isGroupedView()) {
+    await loadGroups();
+    return;
+  }
+
   const grid = document.getElementById('grid');
   grid.textContent = '';
   const spinner = document.createElement('div');
   spinner.className = 'spinner';
   spinner.textContent = 'Loading…';
   grid.appendChild(spinner);
+
+  // If drilling into a series, fetch episodes via the dedicated endpoint
+  if (state.drillGroup) {
+    await loadSeriesEpisodes(state.drillGroup.name);
+    return;
+  }
 
   const params = new URLSearchParams({ page: state.page, limit: state.limit });
   if (state.type)      params.set('type', state.type);
@@ -58,7 +80,221 @@ async function loadMedia() {
   }
 }
 
-// ── Rendering — dispatches to grid or list mode ──────────────────────────────
+// ── Groups shelf (Series / Education overview) ────────────────────────────────
+
+async function loadGroups() {
+  const grid = document.getElementById('grid');
+  grid.textContent = '';
+  document.getElementById('pagination').textContent = '';
+
+  const spinner = document.createElement('div');
+  spinner.className = 'spinner';
+  spinner.textContent = 'Loading…';
+  grid.appendChild(spinner);
+
+  try {
+    const groups = await API.get(`/api/media/groups?type=${state.type}`);
+    renderGroups(groups);
+  } catch {
+    grid.textContent = '';
+    const msg = document.createElement('div');
+    msg.className = 'spinner';
+    msg.textContent = 'Failed to load.';
+    grid.appendChild(msg);
+  }
+}
+
+function renderGroups(groups) {
+  const grid = document.getElementById('grid');
+  grid.textContent = '';
+  grid.classList.remove('list-mode');
+
+  if (!groups.length) {
+    const msg = document.createElement('div');
+    msg.className = 'spinner';
+    msg.textContent = 'No series / courses found. Run a scan or use 🤖 Auto-Classify.';
+    grid.appendChild(msg);
+    return;
+  }
+
+  groups.forEach(group => {
+    const card = document.createElement('div');
+    card.className = 'card group-card';
+    card.title = `${group.count} episode${group.count !== 1 ? 's' : ''}`;
+
+    card.addEventListener('click', () => {
+      state.drillGroup = { name: group.name, type: group.type };
+      renderBreadcrumb(group.name);
+      loadMedia();
+    });
+
+    const img = document.createElement('img');
+    img.src     = group.posterPath || '/img/no-poster.svg';
+    img.alt     = group.name;
+    img.loading = 'lazy';
+    img.onerror = () => { img.onerror = null; img.src = '/img/no-poster.svg'; };
+
+    const info = document.createElement('div');
+    info.className = 'info';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'card-title';
+    titleEl.textContent = group.name;
+
+    const metaEl = document.createElement('div');
+    metaEl.className = 'meta';
+    metaEl.textContent = `${group.count} ${state.type === 'Education' ? 'lesson' : 'episode'}${group.count !== 1 ? 's' : ''}` +
+                         (group.year ? ` · ${group.year}` : '');
+
+    info.appendChild(titleEl);
+    info.appendChild(metaEl);
+    card.appendChild(img);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+}
+
+// ── Series drill-down — list of episodes/lessons ──────────────────────────────
+
+async function loadSeriesEpisodes(seriesName) {
+  const grid = document.getElementById('grid');
+  grid.textContent = '';
+
+  try {
+    const items = await API.get(`/api/media/series/${encodeURIComponent(seriesName)}`);
+    state.total = items.length;
+    if (state.viewMode === 'list') renderTable(items);
+    else renderEpisodeCards(items);
+    document.getElementById('pagination').textContent = '';
+  } catch {
+    grid.textContent = '';
+    const msg = document.createElement('div');
+    msg.className = 'spinner';
+    msg.textContent = 'Failed to load episodes.';
+    grid.appendChild(msg);
+  }
+}
+
+// Episode/lesson cards — show S##E## or Lesson ## badge, plus play button
+function renderEpisodeCards(items) {
+  const grid = document.getElementById('grid');
+  grid.textContent = '';
+  grid.classList.remove('list-mode');
+
+  if (!items.length) {
+    const msg = document.createElement('div');
+    msg.className = 'spinner';
+    msg.textContent = 'No episodes found.';
+    grid.appendChild(msg);
+    return;
+  }
+
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card episode-card' + (selectedIds.has(item.id) ? ' card-selected' : '');
+    card.dataset.id = item.id;
+
+    card.addEventListener('click', () => {
+      if (selectMode) { toggleSelect(item.id, card); return; }
+      openPlayer(item.id);
+    });
+
+    const img = document.createElement('img');
+    img.src     = item.posterPath || '/img/no-poster.svg';
+    img.alt     = item.title;
+    img.loading = 'lazy';
+    img.onerror = () => { img.onerror = null; img.src = '/img/no-poster.svg'; };
+
+    // Episode badge
+    const badge = document.createElement('div');
+    badge.className = 'ep-badge';
+    if (item.seasonNumber && item.episodeNumber) {
+      badge.textContent = `S${String(item.seasonNumber).padStart(2,'0')}E${String(item.episodeNumber).padStart(2,'0')}`;
+    } else if (item.episodeNumber) {
+      const label = item.type === 'Education' ? 'Lesson' : 'Ep';
+      badge.textContent = `${label} ${String(item.episodeNumber).padStart(2,'0')}`;
+    }
+
+    // Select / fav / edit overlays
+    const chk = document.createElement('div');
+    chk.className = 'card-check' + (selectedIds.has(item.id) ? ' checked' : '');
+    chk.textContent = selectedIds.has(item.id) ? '✓' : '';
+
+    const favBtn = document.createElement('button');
+    favBtn.className = 'card-fav' + (item.isFavorite ? ' fav-active' : '');
+    favBtn.textContent = item.isFavorite ? '♥' : '♡';
+    favBtn.addEventListener('click', e => { e.stopPropagation(); toggleFav(item.id); });
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'card-edit';
+    editBtn.textContent = '✏';
+    editBtn.addEventListener('click', e => { e.stopPropagation(); openEditModal(item); });
+
+    const info = document.createElement('div');
+    info.className = 'info';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'card-title';
+    titleEl.textContent = item.title;
+
+    const metaEl = document.createElement('div');
+    metaEl.className = 'meta';
+    const metaParts = [];
+    if (item.seasonNumber) metaParts.push(`Season ${item.seasonNumber}`);
+    if (item.year) metaParts.push(item.year);
+    if (item.rating) metaParts.push(`★ ${item.rating.toFixed(1)}`);
+    metaEl.textContent = metaParts.join(' · ');
+
+    info.appendChild(titleEl);
+    info.appendChild(metaEl);
+
+    card.appendChild(img);
+    if (badge.textContent) card.appendChild(badge);
+    card.appendChild(chk);
+    card.appendChild(favBtn);
+    card.appendChild(editBtn);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+}
+
+// ── Breadcrumb for drill-down ─────────────────────────────────────────────────
+
+function renderBreadcrumb(groupName) {
+  const existing = document.getElementById('breadcrumb');
+  if (existing) existing.remove();
+
+  const bc = document.createElement('div');
+  bc.id = 'breadcrumb';
+  bc.className = 'breadcrumb';
+
+  const back = document.createElement('button');
+  back.className = 'filter-btn breadcrumb-back';
+  back.textContent = `← ${state.type === 'Education' ? 'Courses' : 'Series'}`;
+  back.addEventListener('click', () => {
+    state.drillGroup = null;
+    bc.remove();
+    loadMedia();
+  });
+
+  const sep = document.createElement('span');
+  sep.textContent = ' / ';
+  sep.className = 'bc-sep';
+
+  const current = document.createElement('span');
+  current.className = 'bc-current';
+  current.textContent = groupName;
+
+  bc.appendChild(back);
+  bc.appendChild(sep);
+  bc.appendChild(current);
+
+  // Insert after filters bar
+  const filters = document.querySelector('.filters');
+  filters.insertAdjacentElement('afterend', bc);
+}
+
+// ── Rendering — dispatches ────────────────────────────────────────────────────
 
 function renderMedia(items) {
   if (state.viewMode === 'list') renderTable(items);
@@ -96,19 +332,16 @@ function renderCards(items) {
     img.loading = 'lazy';
     img.onerror = () => { img.onerror = null; img.src = '/img/no-poster.svg'; };
 
-    // Select checkbox (visible in select mode)
     const chk = document.createElement('div');
     chk.className = 'card-check' + (selectedIds.has(item.id) ? ' checked' : '');
     chk.textContent = selectedIds.has(item.id) ? '✓' : '';
 
-    // Favorite toggle
     const favBtn = document.createElement('button');
     favBtn.className = 'card-fav' + (item.isFavorite ? ' fav-active' : '');
     favBtn.textContent = item.isFavorite ? '♥' : '♡';
     favBtn.title = item.isFavorite ? 'Remove from favorites' : 'Add to favorites';
     favBtn.addEventListener('click', e => { e.stopPropagation(); toggleFav(item.id); });
 
-    // Edit overlay
     const editBtn = document.createElement('button');
     editBtn.className = 'card-edit';
     editBtn.textContent = '✏';
@@ -128,7 +361,6 @@ function renderCards(items) {
 
     info.appendChild(titleEl);
     info.appendChild(metaEl);
-
     if (item.isFavorite) {
       const fav = document.createElement('div');
       fav.className = 'fav';
@@ -163,7 +395,6 @@ function renderTable(items) {
   table.className = 'media-table';
 
   const headerRow = table.createTHead().insertRow();
-  // checkbox header cell
   const thChk = document.createElement('th');
   thChk.style.width = '36px';
   if (selectMode) {
@@ -178,7 +409,12 @@ function renderTable(items) {
     thChk.appendChild(allChk);
   }
   headerRow.appendChild(thChk);
-  ['Title', 'Section', 'Year', 'Genres', 'Rating', 'Actions'].forEach(col => {
+
+  // Show episode column when drilling into a series
+  const cols = state.drillGroup
+    ? ['Title', 'Ep', 'Season', 'Rating', 'Actions']
+    : ['Title', 'Section', 'Year', 'Genres', 'Rating', 'Actions'];
+  cols.forEach(col => {
     const th = document.createElement('th');
     th.textContent = col;
     headerRow.appendChild(th);
@@ -189,7 +425,6 @@ function renderTable(items) {
     const row = tbody.insertRow();
     if (selectedIds.has(item.id)) row.classList.add('row-selected');
 
-    // checkbox cell
     const chkCell = row.insertCell();
     if (selectMode) {
       const chk = document.createElement('input');
@@ -208,16 +443,26 @@ function renderTable(items) {
     titleCell.textContent = item.title;
     titleCell.title = item.title;
 
-    const typeCell = row.insertCell();
-    typeCell.textContent = item.type || '—';
+    if (state.drillGroup) {
+      const epCell = row.insertCell();
+      if (item.seasonNumber && item.episodeNumber)
+        epCell.textContent = `S${String(item.seasonNumber).padStart(2,'0')}E${String(item.episodeNumber).padStart(2,'0')}`;
+      else if (item.episodeNumber)
+        epCell.textContent = `#${item.episodeNumber}`;
+      else epCell.textContent = '—';
 
-    const yearCell = row.insertCell();
-    yearCell.textContent = item.year || '—';
-
-    const genresCell = row.insertCell();
-    genresCell.className = 'cell-genres';
-    genresCell.textContent = item.genres || '—';
-    genresCell.title = item.genres || '';
+      const seasonCell = row.insertCell();
+      seasonCell.textContent = item.seasonNumber ?? '—';
+    } else {
+      const typeCell = row.insertCell();
+      typeCell.textContent = item.type || '—';
+      const yearCell = row.insertCell();
+      yearCell.textContent = item.year || '—';
+      const genresCell = row.insertCell();
+      genresCell.className = 'cell-genres';
+      genresCell.textContent = item.genres || '—';
+      genresCell.title = item.genres || '';
+    }
 
     const ratingCell = row.insertCell();
     ratingCell.textContent = item.rating != null ? item.rating.toFixed(1) : '—';
@@ -258,7 +503,32 @@ function renderTable(items) {
   grid.appendChild(table);
 }
 
-// ── Edit modal ───────────────────────────────────────────────────────────────
+// ── Auto-classify ─────────────────────────────────────────────────────────────
+
+async function autoClassify() {
+  const btn = document.getElementById('classifyBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Classifying…';
+  try {
+    const res = await API.post('/api/media/auto-classify', {});
+    showToast(
+      `✓ Auto-classify done — ${res.reclassified} reclassified, ${res.skipped} unchanged.`,
+      6000
+    );
+    // Reset drill-down and reload
+    state.drillGroup = null;
+    const bc = document.getElementById('breadcrumb');
+    if (bc) bc.remove();
+    loadMedia();
+  } catch {
+    showToast('Auto-classify failed.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🤖 Auto-Classify';
+  }
+}
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
 
 function openEditModal(item) {
   editingId = item.id;
@@ -268,7 +538,6 @@ function openEditModal(item) {
   document.getElementById('eRating').value  = item.rating       ?? '';
   document.getElementById('eGenres').value  = item.genres       || '';
   document.getElementById('eDesc').value    = item.description  || '';
-  // reset TMDB status
   const s = document.getElementById('tmdbStatus');
   s.textContent = '';
   s.className = 'tmdb-status';
@@ -315,29 +584,23 @@ async function deleteById(id) {
     await API.del(`/api/media/${id}`);
     showToast('Removed from library.');
     loadMedia();
-  } catch {
-    showToast('Delete failed.');
-  }
+  } catch { showToast('Delete failed.'); }
 }
 
 async function toggleFav(id) {
-  try {
-    await API.post(`/api/media/${id}/favorite`, {});
-    loadMedia();
-  } catch {
-    showToast('Failed to update favorite.');
-  }
+  try { await API.post(`/api/media/${id}/favorite`, {}); loadMedia(); }
+  catch { showToast('Failed to update favorite.'); }
 }
 
 document.getElementById('editModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) e.currentTarget.close();
 });
 
-// ── TMDB refresh ─────────────────────────────────────────────────────────────
+// ── TMDB refresh ──────────────────────────────────────────────────────────────
 
 async function refreshTmdb() {
   if (!editingId) return;
-  const btn = document.getElementById('tmdbRefreshBtn');
+  const btn    = document.getElementById('tmdbRefreshBtn');
   const status = document.getElementById('tmdbStatus');
   btn.disabled = true;
   status.textContent = '⏳ Fetching from TMDB…';
@@ -348,13 +611,12 @@ async function refreshTmdb() {
     if (res.success) {
       status.textContent = '✓ ' + res.message;
       status.className = 'tmdb-status tmdb-ok';
-      // populate updated fields into the form
       if (res.item) {
         if (res.item.description) document.getElementById('eDesc').value   = res.item.description;
         if (res.item.genres)      document.getElementById('eGenres').value = res.item.genres;
         if (res.item.rating)      document.getElementById('eRating').value = res.item.rating;
       }
-      loadMedia(); // refresh poster in grid
+      loadMedia();
     } else {
       status.textContent = '✗ ' + res.message;
       status.className = 'tmdb-status tmdb-fail';
@@ -367,7 +629,7 @@ async function refreshTmdb() {
   }
 }
 
-// ── Add Media modal ──────────────────────────────────────────────────────────
+// ── Add Media modal ───────────────────────────────────────────────────────────
 
 function openAddModal() {
   document.getElementById('aFilePath').value = '';
@@ -410,13 +672,11 @@ document.getElementById('addModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) e.currentTarget.close();
 });
 
-// ── Player ───────────────────────────────────────────────────────────────────
+// ── Player ────────────────────────────────────────────────────────────────────
 
-function openPlayer(id) {
-  location.href = `/player.html?id=${id}`;
-}
+function openPlayer(id) { location.href = `/player.html?id=${id}`; }
 
-// ── Pagination ───────────────────────────────────────────────────────────────
+// ── Pagination ────────────────────────────────────────────────────────────────
 
 function renderPagination() {
   const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
@@ -442,7 +702,7 @@ function renderPagination() {
   el.appendChild(next);
 }
 
-// ── Selection / bulk ─────────────────────────────────────────────────────────
+// ── Selection / bulk ──────────────────────────────────────────────────────────
 
 function toggleSelectMode() {
   selectMode = !selectMode;
@@ -482,26 +742,34 @@ async function applyBulkType() {
     selectedIds.clear();
     updateBulkBar();
     loadMedia();
-  } catch {
-    showToast('Bulk update failed.');
-  }
+  } catch { showToast('Bulk update failed.'); }
 }
 
-// ── Filter / view controls ───────────────────────────────────────────────────
+// ── Filter / view controls ────────────────────────────────────────────────────
 
 function syncAllBtn() {
   document.getElementById('allBtn').classList.toggle('active', !state.type && !state.favorites);
+  document.querySelectorAll('.filter-btn[data-type]').forEach(b =>
+    b.classList.toggle('active', b.dataset.type === state.type));
 }
 
 function clearFilters() {
-  state.type = null; state.favorites = false; state.page = 1;
+  state.type = null; state.page = 1; state.favorites = false;
+  state.drillGroup = null;
+  const bc = document.getElementById('breadcrumb');
+  if (bc) bc.remove();
   savePrefs();
-  document.querySelectorAll('.filter-btn[data-type]').forEach(b => b.classList.remove('active'));
   document.getElementById('favBtn').classList.remove('active');
   loadMedia();
 }
 
 function setFilter(type) {
+  // Reset drill-down when changing section
+  if (state.type !== type) {
+    state.drillGroup = null;
+    const bc = document.getElementById('breadcrumb');
+    if (bc) bc.remove();
+  }
   state.type = state.type === type ? null : type;
   state.page = 1;
   savePrefs();
@@ -529,19 +797,24 @@ function toggleView() {
 document.getElementById('searchInput').addEventListener('input', e => {
   state.search = e.target.value;
   state.page = 1;
+  // Search escapes group view — show flat results
+  if (state.search) {
+    state.drillGroup = null;
+    const bc = document.getElementById('breadcrumb');
+    if (bc) bc.remove();
+  }
   clearTimeout(window._searchTimer);
   window._searchTimer = setTimeout(loadMedia, 400);
 });
 
-
-// ── Sort ─────────────────────────────────────────────────────────────────────
+// ── Sort ──────────────────────────────────────────────────────────────────────
 
 function setSort(field) {
   if (state.sortBy === field) {
-    state.sortDesc = !state.sortDesc; // toggle direction if same field
+    state.sortDesc = !state.sortDesc;
   } else {
     state.sortBy = field;
-    state.sortDesc = field === 'dateAdded'; // date desc by default, others asc
+    state.sortDesc = field === 'dateAdded';
   }
   state.page = 1;
   savePrefs();
@@ -550,8 +823,7 @@ function setSort(field) {
 }
 
 function syncSortButtons() {
-  const fields = ['dateAdded', 'title', 'year', 'rating'];
-  fields.forEach(f => {
+  ['dateAdded', 'title', 'year', 'rating'].forEach(f => {
     const btn = document.getElementById('sort_' + f);
     if (!btn) return;
     const active = state.sortBy === f;
@@ -562,7 +834,7 @@ function syncSortButtons() {
   });
 }
 
-// ── Scan ─────────────────────────────────────────────────────────────────────
+// ── Scan ──────────────────────────────────────────────────────────────────────
 
 let _hubConnection = null;
 
@@ -603,39 +875,26 @@ async function triggerScan() {
   const btn = document.getElementById('scanBtn');
   btn.textContent = 'Scanning…';
   btn.disabled = true;
-  await connectScanHub();
   try {
     await API.post('/api/media/scan', {});
-    showToast('Scan started — check progress…', 4000);
-    setTimeout(() => {
-      if (btn.disabled) { btn.textContent = 'Scan Library'; btn.disabled = false; loadMedia(); }
-    }, 30000);
   } catch (e) {
-    btn.textContent = 'Scan Library'; btn.disabled = false;
-    showToast('Scan error: ' + e.message, 5000);
+    showToast('Scan request failed: ' + e.message);
+    btn.textContent = 'Scan Library';
+    btn.disabled = false;
   }
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
-function showToast(msg, duration = 3500) {
+function showToast(msg, ms = 3000) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), duration);
+  t.style.opacity = '1';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => { t.style.opacity = '0'; }, ms);
 }
 
-// Sync UI controls to restored state on first load
-(function syncInitialState() {
-  // section filter buttons
-  document.querySelectorAll('.filter-btn[data-type]').forEach(b =>
-    b.classList.toggle('active', b.dataset.type === state.type));
-  document.getElementById('allBtn').classList.toggle('active', !state.type);
-  // view mode button
-  const vBtn = document.getElementById('viewBtn');
-  vBtn.textContent = state.viewMode === 'grid' ? '☰ List' : '⊞ Grid';
-  vBtn.classList.toggle('active', state.viewMode === 'list');
-})();
+// ── Init ──────────────────────────────────────────────────────────────────────
 
+connectScanHub();
 loadMedia();

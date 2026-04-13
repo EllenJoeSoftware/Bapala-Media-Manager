@@ -19,6 +19,7 @@ public class BapalaDbContext(DbContextOptions<BapalaDbContext> options) : DbCont
             e.HasIndex(m => m.Year);
             e.HasIndex(m => m.IsFavorite);
             e.HasIndex(m => m.FilePath).IsUnique();
+            e.HasIndex(m => m.SeriesName);
         });
 
         modelBuilder.Entity<WatchHistory>(e =>

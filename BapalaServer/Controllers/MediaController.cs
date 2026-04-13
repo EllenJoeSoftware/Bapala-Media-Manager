@@ -244,4 +244,99 @@ public class MediaController(
 
         return Accepted(new { message = "Scan started. Connect to /hubs/scan for progress." });
     }
+    public record AutoClassifyResult(int Reclassified, int Skipped, int Total);
+
+    /// <summary>
+    /// Auto-classify all media items using the scoring engine.
+    /// Items confidently detected as Series or Education are updated (type +
+    /// SeriesName / SeasonNumber / EpisodeNumber). Unrecognised items are left alone.
+    /// </summary>
+    /// <response code="200">Classification summary</response>
+    [HttpPost("auto-classify")]
+    [ProducesResponseType<AutoClassifyResult>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> AutoClassify()
+    {
+        // Load all items (no pagination — classification is a background op)
+        var all = await repo.GetAllAsync(1, int.MaxValue, null, null, null, false);
+        int reclassified = 0, skipped = 0;
+
+        foreach (var item in all)
+        {
+            var filename  = Path.GetFileName(item.FilePath);
+            var folder    = Path.GetFileName(Path.GetDirectoryName(item.FilePath) ?? "");
+            var (type, seriesScore, courseScore) = MediaScannerService.ScoreFilename(filename, folder);
+            var maxScore  = Math.Max(seriesScore, courseScore);
+
+            // Only re-classify if the engine is confident (score ≥ 2) and the
+            // result differs from Movie (i.e. it actually found series/course signals).
+            // Never override Documentary, MusicVideo — those are manually assigned.
+            bool isManual = item.Type is MediaType.Documentary or MediaType.MusicVideo;
+            if (isManual || maxScore < 2) { skipped++; continue; }
+
+            var parsed = MediaScannerService.ParseFilename(filename, folder);
+
+            item.Type          = type;
+            item.SeriesName    = parsed.SeriesName ?? item.SeriesName;
+            item.SeasonNumber  = parsed.Season     ?? item.SeasonNumber;
+            item.EpisodeNumber = parsed.Episode    ?? parsed.LessonNumber ?? item.EpisodeNumber;
+
+            await repo.UpdateAsync(item);
+            reclassified++;
+        }
+
+        return Ok(new AutoClassifyResult(reclassified, skipped, reclassified + skipped));
+    }
+    public record MediaGroup(
+        string Name,
+        string? PosterPath,
+        MediaType Type,
+        int Count,
+        int? Year);
+
+    /// <summary>
+    /// Return grouped Series/Education items — one entry per unique SeriesName.
+    /// Used to render the series/course shelf where you see one card per show.
+    /// </summary>
+    /// <response code="200">List of groups</response>
+    [HttpGet("groups")]
+    [ProducesResponseType<IEnumerable<MediaGroup>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetGroups([FromQuery] MediaType? type = null)
+    {
+        var items = await repo.GetAllAsync(
+            1, int.MaxValue, type, null, null, false, "title", false);
+
+        var groups = items
+            .Where(i => !string.IsNullOrWhiteSpace(i.SeriesName))
+            .GroupBy(i => i.SeriesName!)
+            .Select(g => new MediaGroup(
+                g.Key,
+                g.FirstOrDefault(x => x.PosterPath != null)?.PosterPath,
+                g.First().Type,
+                g.Count(),
+                g.Min(x => x.Year)))
+            .OrderBy(g => g.Name)
+            .ToList();
+
+        return Ok(groups);
+    }
+
+    /// <summary>
+    /// Return all episodes/lessons belonging to a specific series/course name.
+    /// </summary>
+    /// <response code="200">List of episodes/lessons</response>
+    [HttpGet("series/{seriesName}")]
+    [ProducesResponseType<IEnumerable<MediaItem>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSeriesEpisodes(string seriesName)
+    {
+        var all = await repo.GetAllAsync(
+            1, int.MaxValue, null, null, null, false, "title", false);
+        var episodes = all
+            .Where(i => string.Equals(i.SeriesName, seriesName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(i => i.SeasonNumber ?? 0)
+            .ThenBy(i => i.EpisodeNumber ?? 0)
+            .ThenBy(i => i.Title)
+            .ToList();
+        return Ok(episodes);
+    }
+
 }
