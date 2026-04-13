@@ -99,6 +99,34 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<BapalaDbContext>();
     db.Database.EnsureCreated();
+
+    // Add new grouping columns if they don't exist yet (for existing databases).
+    // EnsureCreated only creates tables from scratch; it doesn't alter existing ones.
+    try
+    {
+        db.Database.ExecuteSqlRaw(
+            "ALTER TABLE MediaItems ADD COLUMN SeriesName TEXT");
+    }
+    catch { /* already exists — ignore */ }
+    try
+    {
+        db.Database.ExecuteSqlRaw(
+            "ALTER TABLE MediaItems ADD COLUMN SeasonNumber INTEGER");
+    }
+    catch { /* already exists — ignore */ }
+    try
+    {
+        db.Database.ExecuteSqlRaw(
+            "ALTER TABLE MediaItems ADD COLUMN EpisodeNumber INTEGER");
+    }
+    catch { /* already exists — ignore */ }
+    // Index on SeriesName (for fast group queries)
+    try
+    {
+        db.Database.ExecuteSqlRaw(
+            "CREATE INDEX IF NOT EXISTS IX_MediaItems_SeriesName ON MediaItems(SeriesName)");
+    }
+    catch { /* ignore */ }
 }
 
 app.UseCors();
