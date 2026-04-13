@@ -35,6 +35,8 @@ public static class MediaPatterns
         new(@"Part[ ._-]?(\d{1,3})", RegexOptions.IgnoreCase),
         new(@"Lecture[ ._-]?(\d{1,3})", RegexOptions.IgnoreCase),
         new(@"Unit[ ._-]?(\d{1,3})", RegexOptions.IgnoreCase),
+        // Leading zero-padded track number: "003 Title", "01 - Intro", "1. Overview"
+        new(@"^(\d{1,3})[ ._-]"),
     ];
 
     // Movie fallback
@@ -49,7 +51,7 @@ public static class MediaPatterns
 
     // Strong bonus signals
     public static readonly Regex StrongSeriesRx = new(@"S\d{1,2}.*E\d{1,2}", RegexOptions.IgnoreCase);
-    public static readonly Regex StrongCourseRx = new(@"Lesson|Module", RegexOptions.IgnoreCase);
+    public static readonly Regex StrongCourseRx = new(@"Lesson|Module|^\d{1,3}[ ._-]", RegexOptions.IgnoreCase);
 
     // Cleanup
     public static readonly Regex CleanRx = new(@"[._-]");
@@ -132,6 +134,7 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
 
         // ── Extract lesson/module/chapter number ──────────────────────────────
         int? lessonNumber = null;
+        // Named keyword patterns: "Lesson 01", "Module 3", "Part 1 - ..."
         var lessonMatch = Regex.Match(raw,
             @"(Lesson|Module|Chapter|Part|Lecture|Unit)[ ._-]?(\d{1,3})",
             RegexOptions.IgnoreCase);
@@ -145,6 +148,24 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
                 var cleaned = CleanTitle(beforeLesson);
                 if (!string.IsNullOrWhiteSpace(cleaned))
                     seriesName = cleaned;
+            }
+        }
+
+        // Leading zero-padded track number: "003 Process Injection - Part 1 - Explanation of APIs"
+        // Only apply if no other lesson number was found yet.
+        if (lessonNumber == null)
+        {
+            var leadMatch = Regex.Match(raw, @"^(\d{1,3})[ ._-]");
+            if (leadMatch.Success)
+            {
+                lessonNumber = int.Parse(leadMatch.Groups[1].Value);
+                // Strip the number prefix from the title — everything after the separator
+                if (seriesName == null)
+                {
+                    // The remainder after "003 " becomes the episode title;
+                    // seriesName comes from the containing folder name (set below).
+                    name = raw[(leadMatch.Index + leadMatch.Length)..].Trim();
+                }
             }
         }
 
