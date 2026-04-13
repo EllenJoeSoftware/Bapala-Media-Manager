@@ -9,6 +9,9 @@
     <conv:NotNullConverter         x:Key="NotNullConverter" />
     <conv:GreaterThanZeroConverter x:Key="GreaterThanZeroConverter" />
     <conv:BoolToChipStyleConverter x:Key="BoolToChipStyleConverter" />
+    <!-- Per-property chip colour converters — safer than binding the Style object -->
+    <conv:BoolToChipBgConverter    x:Key="BoolToChipBgConverter" />
+    <conv:BoolToChipFgConverter    x:Key="BoolToChipFgConverter" />
 
     <!-- ── Page / shell ──────────────────────────────────────────────────── -->
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">

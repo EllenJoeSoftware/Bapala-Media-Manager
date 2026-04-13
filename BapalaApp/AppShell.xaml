@@ -17,7 +17,6 @@
     <TabBar>
         <ShellContent
             Title="Library"
-            Icon="library.png"
             Route="library"
             ContentTemplate="{DataTemplate views:LibraryPage}" />
     </TabBar>

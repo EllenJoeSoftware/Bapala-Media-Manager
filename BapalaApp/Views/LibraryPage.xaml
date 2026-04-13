@@ -31,6 +31,12 @@
             Margin="0" />
 
         <!-- ── Row 1: Filter chips ───────────────────────────────────────── -->
+        <!--
+            We bind BackgroundColor + TextColor directly on each Button rather than
+            binding the Style property via a converter.  Binding an entire Style object
+            is unreliable with compiled bindings; individual visual-property bindings are
+            fully supported and type-safe.
+        -->
         <ScrollView
             Grid.Row="1"
             Orientation="Horizontal"
@@ -38,13 +44,49 @@
             BackgroundColor="{StaticResource SurfaceColor}"
             Padding="12,8">
             <HorizontalStackLayout Spacing="8">
-                <Button Text="All"          Command="{Binding ClearFiltersCommand}"           Style="{Binding AllActive,       Converter={x:StaticResource BoolToChipStyleConverter}}" />
-                <Button Text="Movies"       Command="{Binding SetFilterCommand}" CommandParameter="Movie"       Style="{Binding MoviesActive,    Converter={x:StaticResource BoolToChipStyleConverter}}" />
-                <Button Text="Series"       Command="{Binding SetFilterCommand}" CommandParameter="Series"      Style="{Binding SeriesActive,    Converter={x:StaticResource BoolToChipStyleConverter}}" />
-                <Button Text="Docs"         Command="{Binding SetFilterCommand}" CommandParameter="Documentary" Style="{Binding DocsActive,      Converter={x:StaticResource BoolToChipStyleConverter}}" />
-                <Button Text="Education"    Command="{Binding SetFilterCommand}" CommandParameter="Education"   Style="{Binding EducationActive, Converter={x:StaticResource BoolToChipStyleConverter}}" />
-                <Button Text="Music"        Command="{Binding SetFilterCommand}" CommandParameter="MusicVideo"  Style="{Binding MusicActive,     Converter={x:StaticResource BoolToChipStyleConverter}}" />
-                <Button Text="♥ Favorites"  Command="{Binding ToggleFavoritesCommand}"        Style="{Binding FavoritesActive, Converter={x:StaticResource BoolToChipStyleConverter}}" />
+
+                <Button Text="All"
+                        Command="{Binding ClearFiltersCommand}"
+                        Style="{StaticResource ChipButton}"
+                        BackgroundColor="{Binding AllActive,       Converter={x:StaticResource BoolToChipBgConverter}}"
+                        TextColor="{Binding AllActive,             Converter={x:StaticResource BoolToChipFgConverter}}" />
+
+                <Button Text="Movies"
+                        Command="{Binding SetFilterCommand}" CommandParameter="Movie"
+                        Style="{StaticResource ChipButton}"
+                        BackgroundColor="{Binding MoviesActive,    Converter={x:StaticResource BoolToChipBgConverter}}"
+                        TextColor="{Binding MoviesActive,          Converter={x:StaticResource BoolToChipFgConverter}}" />
+
+                <Button Text="Series"
+                        Command="{Binding SetFilterCommand}" CommandParameter="Series"
+                        Style="{StaticResource ChipButton}"
+                        BackgroundColor="{Binding SeriesActive,    Converter={x:StaticResource BoolToChipBgConverter}}"
+                        TextColor="{Binding SeriesActive,          Converter={x:StaticResource BoolToChipFgConverter}}" />
+
+                <Button Text="Docs"
+                        Command="{Binding SetFilterCommand}" CommandParameter="Documentary"
+                        Style="{StaticResource ChipButton}"
+                        BackgroundColor="{Binding DocsActive,      Converter={x:StaticResource BoolToChipBgConverter}}"
+                        TextColor="{Binding DocsActive,            Converter={x:StaticResource BoolToChipFgConverter}}" />
+
+                <Button Text="Education"
+                        Command="{Binding SetFilterCommand}" CommandParameter="Education"
+                        Style="{StaticResource ChipButton}"
+                        BackgroundColor="{Binding EducationActive, Converter={x:StaticResource BoolToChipBgConverter}}"
+                        TextColor="{Binding EducationActive,       Converter={x:StaticResource BoolToChipFgConverter}}" />
+
+                <Button Text="Music"
+                        Command="{Binding SetFilterCommand}" CommandParameter="MusicVideo"
+                        Style="{StaticResource ChipButton}"
+                        BackgroundColor="{Binding MusicActive,     Converter={x:StaticResource BoolToChipBgConverter}}"
+                        TextColor="{Binding MusicActive,           Converter={x:StaticResource BoolToChipFgConverter}}" />
+
+                <Button Text="♥ Favorites"
+                        Command="{Binding ToggleFavoritesCommand}"
+                        Style="{StaticResource ChipButton}"
+                        BackgroundColor="{Binding FavoritesActive, Converter={x:StaticResource BoolToChipBgConverter}}"
+                        TextColor="{Binding FavoritesActive,       Converter={x:StaticResource BoolToChipFgConverter}}" />
+
             </HorizontalStackLayout>
         </ScrollView>
 
@@ -55,10 +97,10 @@
             IsRefreshing="{Binding IsRefreshing}">
 
             <CollectionView
+                x:Name="MediaGrid"
                 ItemsSource="{Binding Items}"
                 SelectionMode="None"
-                EmptyView="No media found. Try scanning or adjusting filters."
-                EmptyViewTemplate="{x:Null}">
+                EmptyView="No media found. Try scanning or adjusting filters.">
 
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout
@@ -76,14 +118,19 @@
                         HorizontalOptions="Center" />
                 </CollectionView.Header>
 
+                <!--
+                    Commands that need the parent LibraryViewModel are wired in code-behind
+                    (LibraryPage.xaml.cs) via TapGestureRecognizer and Button.Clicked events.
+                    This avoids RelativeSource AncestorType inside a DataTemplate, which is
+                    fragile because the visual tree may not be fully built when a recycled cell
+                    is first bound.
+                -->
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="models:MediaItem">
                         <Grid Padding="4">
-                            <!-- Outer tap → play -->
                             <Grid.GestureRecognizers>
-                                <TapGestureRecognizer
-                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, Path=PlayCommand}"
-                                    CommandParameter="{Binding .}" />
+                                <!-- Play handled in code-behind via MediaGrid_Tapped -->
+                                <TapGestureRecognizer Tapped="OnCardTapped" />
                             </Grid.GestureRecognizers>
 
                             <Border Style="{StaticResource CardFrame}">
@@ -92,7 +139,6 @@
                                     <!-- Poster image -->
                                     <Image
                                         Grid.Row="0"
-                                        Source="{Binding PosterPath}"
                                         Aspect="AspectFill"
                                         BackgroundColor="{StaticResource Surface2Color}">
                                         <Image.Source>
@@ -102,7 +148,7 @@
                                         </Image.Source>
                                     </Image>
 
-                                    <!-- Overlay: favorite button top-right -->
+                                    <!-- Overlay: favorite button top-right — Clicked wired in code-behind -->
                                     <Button
                                         Grid.Row="0"
                                         Text="{Binding FavIcon}"
@@ -116,8 +162,7 @@
                                         VerticalOptions="Start"
                                         HorizontalOptions="End"
                                         Margin="6"
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, Path=ToggleItemFavoriteCommand}"
-                                        CommandParameter="{Binding .}" />
+                                        Clicked="OnFavoriteClicked" />
 
                                     <!-- Title + meta below poster -->
                                     <VerticalStackLayout Grid.Row="1" Padding="8,6,8,8" Spacing="3">
