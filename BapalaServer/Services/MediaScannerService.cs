@@ -141,13 +141,21 @@ public class MediaScannerService(IMediaRepository repo, ITmdbService tmdb) : IMe
         if (lessonMatch.Success)
         {
             lessonNumber = int.Parse(lessonMatch.Groups[2].Value);
-            // Series name = everything before the lesson keyword
+            // Series name = everything before the lesson keyword —
+            // but only when the filename does NOT start with a leading track number
+            // (e.g. "004 DLL Injection - Part 2 - ..."). In that case the text
+            // before "Part" is "004 DLL Injection - " which is not the course name;
+            // the folder name is, so leave seriesName null for the folder fallback.
             if (seriesName == null)
             {
-                var beforeLesson = raw[..lessonMatch.Index];
-                var cleaned = CleanTitle(beforeLesson);
-                if (!string.IsNullOrWhiteSpace(cleaned))
-                    seriesName = cleaned;
+                var hasLeadingNumber = Regex.IsMatch(raw, @"^\d{1,3}[ ._-]");
+                if (!hasLeadingNumber)
+                {
+                    var beforeLesson = raw[..lessonMatch.Index];
+                    var cleaned = CleanTitle(beforeLesson);
+                    if (!string.IsNullOrWhiteSpace(cleaned))
+                        seriesName = cleaned;
+                }
             }
         }
 
