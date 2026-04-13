@@ -1,5 +1,7 @@
 let state = { page: 1, limit: 20, type: null, genre: null, search: '', favorites: false, total: 0, viewMode: 'grid' };
 let editingId = null;
+let selectMode = false;
+let selectedIds = new Set();
 
 // ── Data loading ─────────────────────────────────────────────────────────────
 
@@ -55,9 +57,14 @@ function renderCards(items) {
 
   items.forEach(item => {
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card' + (selectedIds.has(item.id) ? ' card-selected' : '');
     card.setAttribute('role', 'listitem');
-    card.addEventListener('click', () => openPlayer(item.id));
+    card.dataset.id = item.id;
+
+    card.addEventListener('click', () => {
+      if (selectMode) { toggleSelect(item.id, card); return; }
+      openPlayer(item.id);
+    });
 
     const img = document.createElement('img');
     img.src = item.posterPath || '/img/no-poster.svg';
@@ -65,14 +72,19 @@ function renderCards(items) {
     img.loading = 'lazy';
     img.onerror = () => { img.onerror = null; img.src = '/img/no-poster.svg'; };
 
-    // Favorite toggle — top-left on hover
+    // Select checkbox (visible in select mode)
+    const chk = document.createElement('div');
+    chk.className = 'card-check' + (selectedIds.has(item.id) ? ' checked' : '');
+    chk.textContent = selectedIds.has(item.id) ? '✓' : '';
+
+    // Favorite toggle
     const favBtn = document.createElement('button');
     favBtn.className = 'card-fav' + (item.isFavorite ? ' fav-active' : '');
     favBtn.textContent = item.isFavorite ? '♥' : '♡';
     favBtn.title = item.isFavorite ? 'Remove from favorites' : 'Add to favorites';
     favBtn.addEventListener('click', e => { e.stopPropagation(); toggleFav(item.id); });
 
-    // Edit overlay — top-right on hover
+    // Edit overlay
     const editBtn = document.createElement('button');
     editBtn.className = 'card-edit';
     editBtn.textContent = '✏';
@@ -84,7 +96,7 @@ function renderCards(items) {
 
     const titleEl = document.createElement('div');
     titleEl.className = 'card-title';
-    titleEl.textContent = item.title;                  // textContent — XSS safe
+    titleEl.textContent = item.title;
 
     const metaEl = document.createElement('div');
     metaEl.className = 'meta';
@@ -101,6 +113,7 @@ function renderCards(items) {
     }
 
     card.appendChild(img);
+    card.appendChild(chk);
     card.appendChild(favBtn);
     card.appendChild(editBtn);
     card.appendChild(info);
@@ -108,7 +121,7 @@ function renderCards(items) {
   });
 }
 
-// List (table) view — full metadata, Play / Edit / Fav / Delete per row
+// List (table) view
 function renderTable(items) {
   const grid = document.getElementById('grid');
   grid.textContent = '';
@@ -125,22 +138,50 @@ function renderTable(items) {
   const table = document.createElement('table');
   table.className = 'media-table';
 
-  // Header
   const headerRow = table.createTHead().insertRow();
-  ['Title', 'Type', 'Year', 'Genres', 'Rating', 'Actions'].forEach(col => {
+  // checkbox header cell
+  const thChk = document.createElement('th');
+  thChk.style.width = '36px';
+  if (selectMode) {
+    const allChk = document.createElement('input');
+    allChk.type = 'checkbox';
+    allChk.title = 'Select all on page';
+    allChk.addEventListener('change', e => {
+      items.forEach(i => { if (e.target.checked) selectedIds.add(i.id); else selectedIds.delete(i.id); });
+      updateBulkBar();
+      renderTable(items);
+    });
+    thChk.appendChild(allChk);
+  }
+  headerRow.appendChild(thChk);
+  ['Title', 'Section', 'Year', 'Genres', 'Rating', 'Actions'].forEach(col => {
     const th = document.createElement('th');
     th.textContent = col;
     headerRow.appendChild(th);
   });
 
-  // Body
   const tbody = table.createTBody();
   items.forEach(item => {
     const row = tbody.insertRow();
+    if (selectedIds.has(item.id)) row.classList.add('row-selected');
+
+    // checkbox cell
+    const chkCell = row.insertCell();
+    if (selectMode) {
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = selectedIds.has(item.id);
+      chk.addEventListener('change', e => {
+        if (e.target.checked) selectedIds.add(item.id); else selectedIds.delete(item.id);
+        row.classList.toggle('row-selected', e.target.checked);
+        updateBulkBar();
+      });
+      chkCell.appendChild(chk);
+    }
 
     const titleCell = row.insertCell();
     titleCell.className = 'cell-title';
-    titleCell.textContent = item.title;                // textContent — XSS safe
+    titleCell.textContent = item.title;
     titleCell.title = item.title;
 
     const typeCell = row.insertCell();
@@ -173,13 +214,12 @@ function renderTable(items) {
     const favBtn = document.createElement('button');
     favBtn.className = 'filter-btn' + (item.isFavorite ? ' active' : '');
     favBtn.textContent = item.isFavorite ? '♥' : '♡';
-    favBtn.title = item.isFavorite ? 'Remove from favorites' : 'Add to favorites';
     favBtn.addEventListener('click', () => toggleFav(item.id));
 
     const delBtn = document.createElement('button');
     delBtn.className = 'filter-btn btn-danger';
     delBtn.textContent = '🗑';
-    delBtn.title = 'Remove from library (file stays on disk)';
+    delBtn.title = 'Remove from library';
     delBtn.addEventListener('click', () => {
       if (confirm(`Delete "${item.title}" from the library?\n\nThe file on disk will NOT be removed.`))
         deleteById(item.id);
@@ -194,7 +234,7 @@ function renderTable(items) {
   grid.appendChild(table);
 }
 
-// ── Edit / Classify modal ────────────────────────────────────────────────────
+// ── Edit modal ───────────────────────────────────────────────────────────────
 
 function openEditModal(item) {
   editingId = item.id;
@@ -204,6 +244,11 @@ function openEditModal(item) {
   document.getElementById('eRating').value  = item.rating       ?? '';
   document.getElementById('eGenres').value  = item.genres       || '';
   document.getElementById('eDesc').value    = item.description  || '';
+  // reset TMDB status
+  const s = document.getElementById('tmdbStatus');
+  s.textContent = '';
+  s.className = 'tmdb-status';
+  document.getElementById('tmdbRefreshBtn').disabled = false;
   document.getElementById('editModal').showModal();
 }
 
@@ -214,10 +259,8 @@ function closeEditModal() {
 
 async function saveMedia() {
   if (!editingId) return;
-
   const yearRaw   = document.getElementById('eYear').value;
   const ratingRaw = document.getElementById('eRating').value;
-
   const body = {
     title:       document.getElementById('eTitle').value.trim()  || undefined,
     type:        document.getElementById('eType').value          || undefined,
@@ -226,7 +269,6 @@ async function saveMedia() {
     genres:      document.getElementById('eGenres').value.trim() || undefined,
     description: document.getElementById('eDesc').value.trim()  || undefined,
   };
-
   try {
     await API.put(`/api/media/${editingId}`, body);
     closeEditModal();
@@ -263,10 +305,43 @@ async function toggleFav(id) {
   }
 }
 
-// Close when clicking outside (backdrop click)
 document.getElementById('editModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) e.currentTarget.close();
 });
+
+// ── TMDB refresh ─────────────────────────────────────────────────────────────
+
+async function refreshTmdb() {
+  if (!editingId) return;
+  const btn = document.getElementById('tmdbRefreshBtn');
+  const status = document.getElementById('tmdbStatus');
+  btn.disabled = true;
+  status.textContent = '⏳ Fetching from TMDB…';
+  status.className = 'tmdb-status tmdb-pending';
+
+  try {
+    const res = await API.post(`/api/media/${editingId}/refresh-tmdb`, {});
+    if (res.success) {
+      status.textContent = '✓ ' + res.message;
+      status.className = 'tmdb-status tmdb-ok';
+      // populate updated fields into the form
+      if (res.item) {
+        if (res.item.description) document.getElementById('eDesc').value   = res.item.description;
+        if (res.item.genres)      document.getElementById('eGenres').value = res.item.genres;
+        if (res.item.rating)      document.getElementById('eRating').value = res.item.rating;
+      }
+      loadMedia(); // refresh poster in grid
+    } else {
+      status.textContent = '✗ ' + res.message;
+      status.className = 'tmdb-status tmdb-fail';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    status.textContent = '✗ Request failed: ' + e.message;
+    status.className = 'tmdb-status tmdb-fail';
+    btn.disabled = false;
+  }
+}
 
 // ── Add Media modal ──────────────────────────────────────────────────────────
 
@@ -278,15 +353,11 @@ function openAddModal() {
   document.getElementById('addModal').showModal();
 }
 
-function closeAddModal() {
-  document.getElementById('addModal').close();
-}
+function closeAddModal() { document.getElementById('addModal').close(); }
 
-// Auto-fill title from the filename portion of the path typed so far
 function autofillTitle() {
   const fp = document.getElementById('aFilePath').value.trim();
   const filename = fp.split(/[\\/]/).pop() || '';
-  // Strip extension, replace common separators with spaces: film.dark.knight → film dark knight
   const name = filename.replace(/\.[^.]+$/, '').replace(/[._-]+/g, ' ').trim();
   if (name) document.getElementById('aTitle').value = name;
 }
@@ -294,7 +365,6 @@ function autofillTitle() {
 async function saveNewMedia() {
   const filePath = document.getElementById('aFilePath').value.trim();
   if (!filePath) { showToast('File path is required.'); return; }
-
   const yearRaw = document.getElementById('aYear').value;
   const body = {
     filePath,
@@ -302,14 +372,13 @@ async function saveNewMedia() {
     type:  document.getElementById('aType').value,
     year:  yearRaw ? parseInt(yearRaw, 10) : undefined,
   };
-
   try {
     await API.post('/api/media', body);
     closeAddModal();
     showToast('Added to library.');
     loadMedia();
   } catch (e) {
-    showToast('Failed: ' + e.message);
+    showToast(e.message.includes('409') ? 'Already in library.' : 'Add failed.');
   }
 }
 
@@ -317,52 +386,94 @@ document.getElementById('addModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) e.currentTarget.close();
 });
 
+// ── Player ───────────────────────────────────────────────────────────────────
+
+function openPlayer(id) {
+  location.href = `/player.html?id=${id}`;
+}
+
 // ── Pagination ───────────────────────────────────────────────────────────────
 
 function renderPagination() {
-  const totalPages = Math.ceil(state.total / state.limit) || 1;
+  const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
   const el = document.getElementById('pagination');
   el.textContent = '';
+  if (totalPages <= 1) return;
 
   const prev = document.createElement('button');
   prev.textContent = '← Prev';
   prev.disabled = state.page <= 1;
-  prev.addEventListener('click', () => changePage(state.page - 1));
+  prev.addEventListener('click', () => { state.page--; loadMedia(); });
+  el.appendChild(prev);
 
-  const label = document.createElement('span');
-  label.style.cssText = 'padding:6px 12px;color:var(--text2)';
-  label.textContent = `${state.page} / ${totalPages}  (${state.total} items)`;
+  const info = document.createElement('span');
+  info.textContent = `Page ${state.page} / ${totalPages}`;
+  info.style.cssText = 'padding:0 12px;color:var(--text2);font-size:.85rem;line-height:32px';
+  el.appendChild(info);
 
   const next = document.createElement('button');
   next.textContent = 'Next →';
   next.disabled = state.page >= totalPages;
-  next.addEventListener('click', () => changePage(state.page + 1));
-
-  el.appendChild(prev);
-  el.appendChild(label);
+  next.addEventListener('click', () => { state.page++; loadMedia(); });
   el.appendChild(next);
 }
 
-// ── Controls ─────────────────────────────────────────────────────────────────
+// ── Selection / bulk ─────────────────────────────────────────────────────────
 
-function changePage(p) { state.page = p; loadMedia(); }
-function openPlayer(id) { location.href = `/player.html?id=${id}`; }
-
-// "All" button — clears every filter and shows the full library
-function clearFilters() {
-  state.type = null;
-  state.favorites = false;
-  state.search = '';
-  state.page = 1;
-  document.getElementById('searchInput').value = '';
-  document.querySelectorAll('.filter-btn[data-type]').forEach(b => b.classList.remove('active'));
-  document.getElementById('favBtn').classList.remove('active');
-  loadMedia();   // syncAllBtn() is called inside loadMedia after data arrives
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds.clear();
+  const btn = document.getElementById('selectBtn');
+  btn.textContent = selectMode ? '✕ Cancel Select' : '☑ Select';
+  btn.classList.toggle('active', selectMode);
+  document.getElementById('bulkBar').style.display = selectMode ? 'flex' : 'none';
+  document.body.classList.toggle('select-mode', selectMode);
+  updateBulkBar();
+  loadMedia();
 }
 
-// "All" button is active when no type filter and not in favorites-only mode
+function toggleSelect(id, cardEl) {
+  if (selectedIds.has(id)) { selectedIds.delete(id); cardEl.classList.remove('card-selected'); }
+  else                     { selectedIds.add(id);    cardEl.classList.add('card-selected'); }
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  document.getElementById('bulkCount').textContent = `${selectedIds.size} selected`;
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  updateBulkBar();
+  loadMedia();
+}
+
+async function applyBulkType() {
+  if (selectedIds.size === 0) { showToast('No items selected.'); return; }
+  const type = document.getElementById('bulkType').value;
+  const ids = [...selectedIds];
+  try {
+    const res = await API.post('/api/media/bulk-type', { ids, type });
+    showToast(`✓ Moved ${res.updated} item(s) to ${type}.`, 4000);
+    selectedIds.clear();
+    updateBulkBar();
+    loadMedia();
+  } catch {
+    showToast('Bulk update failed.');
+  }
+}
+
+// ── Filter / view controls ───────────────────────────────────────────────────
+
 function syncAllBtn() {
   document.getElementById('allBtn').classList.toggle('active', !state.type && !state.favorites);
+}
+
+function clearFilters() {
+  state.type = null; state.favorites = false; state.page = 1;
+  document.querySelectorAll('.filter-btn[data-type]').forEach(b => b.classList.remove('active'));
+  document.getElementById('favBtn').classList.remove('active');
+  loadMedia();
 }
 
 function setFilter(type) {
@@ -397,12 +508,10 @@ document.getElementById('searchInput').addEventListener('input', e => {
 
 // ── Scan ─────────────────────────────────────────────────────────────────────
 
-// SignalR connection for real-time scan progress
 let _hubConnection = null;
 
 async function connectScanHub() {
   if (_hubConnection) return;
-  // SignalR script loaded from CDN in index.html
   if (typeof signalR === 'undefined') return;
   _hubConnection = new signalR.HubConnectionBuilder()
     .withUrl('/hubs/scan')
@@ -412,12 +521,10 @@ async function connectScanHub() {
   _hubConnection.on('ScanStarted', data => {
     showToast('Scan started — ' + (data.folders || []).length + ' folder(s)…', 8000);
   });
-
   _hubConnection.on('ScanProgress', data => {
     const btn = document.getElementById('scanBtn');
     if (btn) btn.textContent = `Scanning… (${data.current}/${data.total})`;
   });
-
   _hubConnection.on('ScanCompleted', data => {
     const btn = document.getElementById('scanBtn');
     if (btn) { btn.textContent = 'Scan Library'; btn.disabled = false; }
@@ -425,16 +532,15 @@ async function connectScanHub() {
     const msg = `Scan done ✓  Added: ${data.added}  Skipped: ${data.skipped}` +
       (errors > 0 ? `  Errors: ${errors}` : '');
     showToast(msg, 6000);
-    loadMedia(); // refresh the grid
+    loadMedia();
   });
-
   _hubConnection.on('ScanError', data => {
     const btn = document.getElementById('scanBtn');
     if (btn) { btn.textContent = 'Scan Library'; btn.disabled = false; }
     showToast('Scan failed: ' + (data.error || 'Unknown error'), 8000);
   });
 
-  try { await _hubConnection.start(); } catch { /* hub optional — scan still works */ }
+  try { await _hubConnection.start(); } catch { /* hub optional */ }
 }
 
 async function triggerScan() {
@@ -445,7 +551,6 @@ async function triggerScan() {
   try {
     await API.post('/api/media/scan', {});
     showToast('Scan started — check progress…', 4000);
-    // Re-enable button after timeout in case SignalR isn't connected
     setTimeout(() => {
       if (btn.disabled) { btn.textContent = 'Scan Library'; btn.disabled = false; loadMedia(); }
     }, 30000);
@@ -459,7 +564,7 @@ async function triggerScan() {
 
 function showToast(msg, duration = 3500) {
   const t = document.getElementById('toast');
-  t.textContent = msg;                               // textContent — XSS safe
+  t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), duration);

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bapala</title>
-  <link rel="stylesheet" href="/css/app.css?v=4">
+  <link rel="stylesheet" href="/css/app.css?v=5">
 </head>
 <body>
 <nav>
@@ -15,16 +15,34 @@
   <input type="search" id="searchInput" placeholder="Search titles…" aria-label="Search">
 </nav>
 <div class="filters">
-  <button class="filter-btn active" id="allBtn"          onclick="clearFilters()">All</button>
-  <button class="filter-btn" data-type="Movie"           onclick="setFilter('Movie')">Movies</button>
-  <button class="filter-btn" data-type="Series"          onclick="setFilter('Series')">Series</button>
-  <button class="filter-btn" data-type="Documentary"     onclick="setFilter('Documentary')">Docs</button>
-  <button class="filter-btn" id="favBtn"                 onclick="toggleFavorites()">Favorites</button>
+  <button class="filter-btn active" id="allBtn"             onclick="clearFilters()">All</button>
+  <button class="filter-btn" data-type="Movie"              onclick="setFilter('Movie')">Movies</button>
+  <button class="filter-btn" data-type="Series"             onclick="setFilter('Series')">Series</button>
+  <button class="filter-btn" data-type="Documentary"        onclick="setFilter('Documentary')">Docs</button>
+  <button class="filter-btn" data-type="Education"          onclick="setFilter('Education')">Education</button>
+  <button class="filter-btn" id="favBtn"                    onclick="toggleFavorites()">Favorites</button>
   <div class="spacer" style="flex:1"></div>
-  <button class="filter-btn" id="addBtn"   onclick="openAddModal()">+ Add</button>
-  <button class="filter-btn" id="scanBtn"  onclick="triggerScan()">Scan Library</button>
-  <button class="filter-btn" id="viewBtn"  onclick="toggleView()">☰ List</button>
+  <button class="filter-btn" id="selectBtn"  onclick="toggleSelectMode()">☑ Select</button>
+  <button class="filter-btn" id="addBtn"     onclick="openAddModal()">+ Add</button>
+  <button class="filter-btn" id="scanBtn"    onclick="triggerScan()">Scan Library</button>
+  <button class="filter-btn" id="viewBtn"    onclick="toggleView()">☰ List</button>
 </div>
+
+<!-- Bulk action bar (visible only in select mode) -->
+<div class="bulk-bar" id="bulkBar" style="display:none">
+  <span id="bulkCount">0 selected</span>
+  <label for="bulkType">Move to section:</label>
+  <select id="bulkType" class="text-input bulk-select">
+    <option value="Movie">Movie</option>
+    <option value="Series">Series</option>
+    <option value="Documentary">Documentary</option>
+    <option value="Education">Education</option>
+  </select>
+  <button class="btn bulk-apply-btn" onclick="applyBulkType()">Apply</button>
+  <button class="filter-btn" onclick="clearSelection()">Deselect All</button>
+  <button class="filter-btn btn-danger" onclick="toggleSelectMode()">Cancel</button>
+</div>
+
 <div class="grid" id="grid" role="list"></div>
 <div class="pagination" id="pagination"></div>
 <div class="toast" id="toast" role="status"></div>
@@ -42,11 +60,12 @@
     </div>
     <div class="modal-row">
       <div class="form-group">
-        <label for="eType">Type</label>
+        <label for="eType">Section</label>
         <select id="eType" class="text-input">
           <option value="Movie">Movie</option>
           <option value="Series">Series</option>
           <option value="Documentary">Documentary</option>
+          <option value="Education">Education</option>
         </select>
       </div>
       <div class="form-group">
@@ -54,7 +73,7 @@
         <input id="eYear" class="text-input" type="number" min="1900" max="2099">
       </div>
       <div class="form-group">
-        <label for="eRating">Rating <small>0 – 10</small></label>
+        <label for="eRating">Rating <small>0–10</small></label>
         <input id="eRating" class="text-input" type="number" min="0" max="10" step="0.1">
       </div>
     </div>
@@ -65,6 +84,13 @@
     <div class="form-group">
       <label for="eDesc">Description</label>
       <textarea id="eDesc" class="text-input" rows="4" style="resize:vertical"></textarea>
+    </div>
+    <!-- TMDB refresh -->
+    <div class="tmdb-refresh-row">
+      <button class="filter-btn tmdb-btn" id="tmdbRefreshBtn" onclick="refreshTmdb()">
+        🔄 Fetch / Refresh from TMDB
+      </button>
+      <span id="tmdbStatus" class="tmdb-status"></span>
     </div>
   </div>
   <div class="modal-footer">
@@ -93,11 +119,12 @@
     </div>
     <div class="modal-row">
       <div class="form-group">
-        <label for="aType">Type</label>
+        <label for="aType">Section</label>
         <select id="aType" class="text-input">
           <option value="Movie">Movie</option>
           <option value="Series">Series</option>
           <option value="Documentary">Documentary</option>
+          <option value="Education">Education</option>
         </select>
       </div>
       <div class="form-group">
@@ -114,7 +141,7 @@
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-<script src="/js/api.js?v=4"></script>
-<script src="/js/app.js?v=4"></script>
+<script src="/js/api.js?v=5"></script>
+<script src="/js/app.js?v=5"></script>
 </body>
 </html>

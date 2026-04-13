@@ -118,3 +118,40 @@ nav input { background: var(--surface2); border: 1px solid #333; color: var(--te
 /* ── Edit modal: delete button sits left, save/cancel right ─────────────── */
 .modal-footer { justify-content: flex-start; }
 .modal-footer .spacer { flex: 1; }
+
+/* ── Education filter button ─────────────────────────────────────────────── */
+.filter-btn[data-type="Education"] { }
+
+/* ── Bulk action bar ─────────────────────────────────────────────────────── */
+.bulk-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 24px; background: var(--surface2); border-bottom: 1px solid #444;
+  font-size: .875rem;
+}
+.bulk-bar label { color: var(--text2); }
+.bulk-select { width: auto; padding: 6px 10px; }
+.bulk-apply-btn { width: auto; padding: 6px 18px; font-size: .875rem; }
+#bulkCount { color: var(--accent); font-weight: 600; min-width: 80px; }
+
+/* ── Card / row selection state ──────────────────────────────────────────── */
+.card-check {
+  position: absolute; top: 8px; left: 8px; width: 22px; height: 22px;
+  background: rgba(0,0,0,.75); border: 2px solid #666; border-radius: 4px;
+  display: none; align-items: center; justify-content: center;
+  font-size: .8rem; color: #fff; z-index: 3;
+}
+.card-check.checked { background: var(--accent); border-color: var(--accent); }
+body.select-mode .card-check { display: flex; }
+.card-selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row-selected td { background: rgba(229,9,20,.08) !important; }
+
+/* ── TMDB refresh row inside edit modal ──────────────────────────────────── */
+.tmdb-refresh-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-top: 4px;
+}
+.tmdb-btn { white-space: nowrap; }
+.tmdb-status { font-size: .82rem; }
+.tmdb-pending { color: var(--text2); }
+.tmdb-ok      { color: #4caf50; }
+.tmdb-fail    { color: var(--accent); }
