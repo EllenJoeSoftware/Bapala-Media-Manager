@@ -181,3 +181,24 @@ body.select-mode .card-check { display: flex; }
 .resume-icon { font-size: 1.2rem; }
 .resume-yes  { width: auto; padding: 7px 18px; font-size: .85rem; }
 .resume-no   { padding: 7px 14px; font-size: .85rem; }
+
+/* ── Group shelf (Series / Education) ───────────────────────────────────── */
+.card-group { cursor: pointer; }
+.card-group:hover { transform: scale(1.04); }
+
+/* Episode count badge */
+.group-badge {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,0,0,.75); color: #fff;
+  font-size: .72rem; font-weight: 700;
+  padding: 3px 7px; border-radius: 20px;
+  pointer-events: none;
+}
+
+/* Breadcrumb nav shown when drilling into a series */
+.breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 24px 4px; font-size: .9rem; color: var(--text2);
+}
+.breadcrumb-label { color: var(--text); font-weight: 600; }
+.breadcrumb-back  { padding: 5px 12px; font-size: .82rem; }

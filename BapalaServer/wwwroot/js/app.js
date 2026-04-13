@@ -24,39 +24,7 @@ let editingId = null;
 let selectMode = false;
 let selectedIds = new Set();
 
-// ── Data loading ─────────────────────────────────────────────────────────────
 
-async function loadMedia() {
-  const grid = document.getElementById('grid');
-  grid.textContent = '';
-  const spinner = document.createElement('div');
-  spinner.className = 'spinner';
-  spinner.textContent = 'Loading…';
-  grid.appendChild(spinner);
-
-  const params = new URLSearchParams({ page: state.page, limit: state.limit });
-  if (state.type)      params.set('type', state.type);
-  if (state.genre)     params.set('genre', state.genre);
-  if (state.search)    params.set('search', state.search);
-  if (state.favorites) params.set('favorites', 'true');
-  params.set('sortBy', state.sortBy);
-  params.set('sortDesc', state.sortDesc);
-
-  try {
-    const data = await API.get('/api/media?' + params);
-    state.total = data.total;
-    renderMedia(data.items);
-    renderPagination();
-    syncAllBtn();
-    syncSortButtons();
-  } catch {
-    grid.textContent = '';
-    const msg = document.createElement('div');
-    msg.className = 'spinner';
-    msg.textContent = 'Failed to load. Check connection.';
-    grid.appendChild(msg);
-  }
-}
 
 // ── Rendering — dispatches to grid or list mode ──────────────────────────────
 
@@ -639,3 +607,218 @@ function showToast(msg, duration = 3500) {
 })();
 
 loadMedia();
+
+
+// ── Grouped view (Series / Education) ────────────────────────────────────────
+
+// Types that show a grouped "shelf" instead of flat cards
+const GROUP_TYPES = ['Series', 'Education'];
+
+// State for drill-down: when set, we're inside a series/course
+let drillSeries = null;  // { name, type }
+
+async function loadMedia() {
+  const grid = document.getElementById('grid');
+  grid.textContent = '';
+  const spinner = document.createElement('div');
+  spinner.className = 'spinner';
+  spinner.textContent = 'Loading…';
+  grid.appendChild(spinner);
+
+  // If we're in a grouped section and not drilling down, show the group shelf
+  if (state.type && GROUP_TYPES.includes(state.type) && !drillSeries) {
+    await loadGroupShelf(state.type);
+    return;
+  }
+
+  // If drilling into a series/course, show episode list
+  if (drillSeries) {
+    await loadSeriesEpisodes(drillSeries.name);
+    return;
+  }
+
+  // Normal flat view
+  const params = new URLSearchParams({ page: state.page, limit: state.limit });
+  if (state.type)      params.set('type', state.type);
+  if (state.genre)     params.set('genre', state.genre);
+  if (state.search)    params.set('search', state.search);
+  if (state.favorites) params.set('favorites', 'true');
+  params.set('sortBy', state.sortBy);
+  params.set('sortDesc', state.sortDesc);
+
+  try {
+    const data = await API.get('/api/media?' + params);
+    state.total = data.total;
+    renderMedia(data.items);
+    renderPagination();
+    syncAllBtn();
+    syncSortButtons();
+  } catch {
+    grid.textContent = '';
+    const msg = document.createElement('div');
+    msg.className = 'spinner';
+    msg.textContent = 'Failed to load. Check connection.';
+    grid.appendChild(msg);
+  }
+}
+
+async function loadGroupShelf(type) {
+  const grid = document.getElementById('grid');
+  try {
+    const groups = await API.get(`/api/media/groups?type=${type}`);
+    grid.textContent = '';
+    grid.classList.remove('list-mode');
+
+    if (!groups.length) {
+      const msg = document.createElement('div');
+      msg.className = 'spinner';
+      msg.textContent = `No ${type === 'Education' ? 'courses' : 'series'} found. Try Auto-Classify first.`;
+      grid.appendChild(msg);
+      return;
+    }
+
+    groups.forEach(group => {
+      const card = document.createElement('div');
+      card.className = 'card card-group';
+      card.setAttribute('role', 'listitem');
+      card.title = `${group.count} episode${group.count !== 1 ? 's' : ''}`;
+
+      card.addEventListener('click', () => {
+        drillSeries = { name: group.name, type: group.type };
+        renderBreadcrumb(group.name);
+        loadMedia();
+      });
+
+      const img = document.createElement('img');
+      img.src = group.posterPath || '/img/no-poster.svg';
+      img.alt = group.name;
+      img.loading = 'lazy';
+      img.onerror = () => { img.onerror = null; img.src = '/img/no-poster.svg'; };
+
+      const badge = document.createElement('div');
+      badge.className = 'group-badge';
+      badge.textContent = group.count;
+
+      const info = document.createElement('div');
+      info.className = 'info';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'card-title';
+      titleEl.textContent = group.name;
+
+      const metaEl = document.createElement('div');
+      metaEl.className = 'meta';
+      metaEl.textContent = [group.year, `${group.count} item${group.count !== 1 ? 's' : ''}`]
+        .filter(Boolean).join(' · ');
+
+      info.appendChild(titleEl);
+      info.appendChild(metaEl);
+      card.appendChild(img);
+      card.appendChild(badge);
+      card.appendChild(info);
+      grid.appendChild(card);
+    });
+  } catch {
+    grid.textContent = '';
+    const msg = document.createElement('div');
+    msg.className = 'spinner';
+    msg.textContent = 'Failed to load groups.';
+    grid.appendChild(msg);
+  }
+}
+
+async function loadSeriesEpisodes(seriesName) {
+  const grid = document.getElementById('grid');
+  try {
+    const episodes = await API.get(`/api/media/series/${encodeURIComponent(seriesName)}`);
+    grid.textContent = '';
+
+    if (!episodes.length) {
+      const msg = document.createElement('div');
+      msg.className = 'spinner';
+      msg.textContent = 'No episodes found.';
+      grid.appendChild(msg);
+      return;
+    }
+
+    if (state.viewMode === 'list') {
+      renderTable(episodes);
+    } else {
+      renderCards(episodes);
+    }
+  } catch {
+    grid.textContent = '';
+    const msg = document.createElement('div');
+    msg.className = 'spinner';
+    msg.textContent = 'Failed to load episodes.';
+    grid.appendChild(msg);
+  }
+}
+
+function renderBreadcrumb(seriesName) {
+  let bc = document.getElementById('breadcrumb');
+  if (!bc) {
+    bc = document.createElement('div');
+    bc.id = 'breadcrumb';
+    bc.className = 'breadcrumb';
+    const grid = document.getElementById('grid');
+    grid.parentNode.insertBefore(bc, grid);
+  }
+  bc.innerHTML = '';
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'filter-btn breadcrumb-back';
+  backBtn.textContent = '← Back';
+  backBtn.addEventListener('click', () => {
+    drillSeries = null;
+    bc.remove();
+    loadMedia();
+  });
+
+  const sep = document.createElement('span');
+  sep.textContent = ' / ';
+  sep.style.color = 'var(--text2)';
+
+  const label = document.createElement('span');
+  label.className = 'breadcrumb-label';
+  label.textContent = seriesName;
+
+  bc.appendChild(backBtn);
+  bc.appendChild(sep);
+  bc.appendChild(label);
+}
+
+// Remove breadcrumb when leaving drill-down
+const _origSetFilter = setFilter;
+function setFilter(type) {
+  drillSeries = null;
+  const bc = document.getElementById('breadcrumb');
+  if (bc) bc.remove();
+  _origSetFilter(type);
+}
+
+const _origClearFilters = clearFilters;
+function clearFilters() {
+  drillSeries = null;
+  const bc = document.getElementById('breadcrumb');
+  if (bc) bc.remove();
+  _origClearFilters();
+}
+
+// ── Auto-Classify ─────────────────────────────────────────────────────────────
+
+async function autoClassify() {
+  const btn = document.getElementById('autoClassifyBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Classifying…';
+  try {
+    const res = await API.post('/api/media/auto-classify', {});
+    showToast(`✓ Auto-classified ${res.reclassified} item(s). ${res.skipped} skipped.`, 6000);
+    loadMedia();
+  } catch {
+    showToast('Auto-classify failed.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🤖 Auto-Classify';
+  }
+}
