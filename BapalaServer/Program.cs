@@ -1,16 +1,18 @@
 using Scalar.AspNetCore;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
 using BapalaServer.Data;
 using BapalaServer.Repositories;
 using BapalaServer.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database — use an absolute path so the same file is used regardless of
-// working directory (dotnet run vs running the compiled exe from bin/).
+// Database
 var dbRelative = builder.Configuration.GetConnectionString("Default") ?? "Data Source=bapala.db";
 var dbFileName = dbRelative.Replace("Data Source=", "").Trim();
 if (!Path.IsPathRooted(dbFileName))
@@ -27,10 +29,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-            ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidateIssuer   = true,
+            ValidIssuer      = builder.Configuration["Jwt:Issuer"],
             ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidAudience    = builder.Configuration["Jwt:Audience"],
             ValidateLifetime = true
         };
         // Allow JWT in query string for HTML <video> elements (can't set headers)
@@ -46,7 +48,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
-// Services (stubs for later tasks — will be fully implemented in Tasks 5-10)
+// Services
 builder.Services.AddScoped<IMediaRepository, SqliteMediaRepository>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IMediaScannerService, MediaScannerService>();
@@ -65,12 +67,13 @@ builder.Services.AddCors(opt => opt.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddHttpClient();
 
-// OpenAPI / Swagger
+// OpenAPI / Scalar
 builder.Services.AddOpenApi(opt =>
 {
+    // Document info
     opt.AddDocumentTransformer((doc, ctx, ct) =>
     {
-        doc.Info = new Microsoft.OpenApi.Models.OpenApiInfo
+        doc.Info = new OpenApiInfo
         {
             Title       = "Bapala Media Server API",
             Version     = "v1",
@@ -78,16 +81,11 @@ builder.Services.AddOpenApi(opt =>
                           "All /api/media and /api/stream endpoints require a Bearer JWT. " +
                           "Obtain a token via POST /api/auth/login."
         };
-        doc.Components ??= new();
-        doc.Components.SecuritySchemes["Bearer"] = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-        {
-            Type        = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-            Scheme      = "bearer",
-            BearerFormat = "JWT",
-            Description = "Enter your JWT token (without the 'Bearer ' prefix)"
-        };
         return Task.CompletedTask;
     });
+
+    // Bearer JWT security scheme
+    opt.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
 });
 
 // Listen on configured port
@@ -110,7 +108,6 @@ var defaultFiles = new DefaultFilesOptions();
 defaultFiles.DefaultFileNames.Clear();
 defaultFiles.DefaultFileNames.Add("login.html");
 app.UseDefaultFiles(defaultFiles);
-// Force revalidation of JS/CSS so browsers never silently serve stale script files
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
@@ -126,8 +123,10 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<BapalaServer.Hubs.ScanProgressHub>("/hubs/scan");
 
-// OpenAPI JSON endpoint + Scalar UI (available in development and production)
-app.MapOpenApi();  // → /openapi/v1.json
+// OpenAPI JSON  →  /openapi/v1.json
+app.MapOpenApi();
+
+// Scalar UI  →  /scalar/v1
 app.MapScalarApiReference(opt =>
 {
     opt.Title = "Bapala API";
@@ -137,8 +136,36 @@ app.MapScalarApiReference(opt =>
     {
         PreferredSecurityScheme = "Bearer"
     };
-});  // → /scalar/v1
+});
 
 app.Run();
 
 public partial class Program { }  // Required for WebApplicationFactory in integration tests
+
+// ── Bearer security scheme transformer ───────────────────────────────────────
+// Follows the pattern from Microsoft docs: uses IAuthenticationSchemeProvider
+// to detect that JwtBearer is registered, then adds the scheme to the document.
+internal sealed class BearerSecuritySchemeTransformer(
+    Microsoft.AspNetCore.Authentication.IAuthenticationSchemeProvider authSchemeProvider)
+    : IOpenApiDocumentTransformer
+{
+    public async Task TransformAsync(
+        OpenApiDocument document,
+        OpenApiDocumentTransformerContext context,
+        CancellationToken cancellationToken)
+    {
+        var schemes = await authSchemeProvider.GetAllSchemesAsync();
+        if (schemes.Any(s => s.Name == JwtBearerDefaults.AuthenticationScheme))
+        {
+            document.Components ??= new OpenApiComponents();
+            document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+            document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+            {
+                Type         = SecuritySchemeType.Http,
+                Scheme       = "bearer",
+                BearerFormat = "JWT",
+                Description  = "Enter your JWT (without the 'Bearer ' prefix). Get one from POST /api/auth/login."
+            };
+        }
+    }
+}
