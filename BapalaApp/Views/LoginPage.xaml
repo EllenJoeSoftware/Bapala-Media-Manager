@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="BapalaApp.Views.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:BapalaApp.ViewModels"
+    x:DataType="vm:LoginViewModel"
+    Title="{Binding Title}"
+    BackgroundColor="{StaticResource BgColor}"
+    Shell.NavBarIsVisible="False">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="32"
+            Spacing="0"
+            VerticalOptions="Center"
+            MinimumHeightRequest="600">
+
+            <!-- Logo / brand -->
+            <Label
+                Text="Bapala"
+                FontSize="40"
+                FontAttributes="Bold"
+                TextColor="{StaticResource AccentColor}"
+                HorizontalOptions="Center"
+                Margin="0,0,0,8" />
+            <Label
+                Text="Your personal media server"
+                Style="{StaticResource SubLabel}"
+                HorizontalOptions="Center"
+                Margin="0,0,0,40" />
+
+            <!-- Server URL -->
+            <Label Text="Server Address" Style="{StaticResource SubLabel}" Margin="0,0,0,6" />
+            <Entry
+                Text="{Binding ServerUrl}"
+                Placeholder="http://192.168.1.5:8484"
+                Keyboard="Url"
+                ReturnType="Next"
+                Margin="0,0,0,16" />
+
+            <!-- Username -->
+            <Label Text="Username" Style="{StaticResource SubLabel}" Margin="0,0,0,6" />
+            <Entry
+                Text="{Binding Username}"
+                Placeholder="admin"
+                ReturnType="Next"
+                Margin="0,0,0,16" />
+
+            <!-- Password -->
+            <Label Text="Password" Style="{StaticResource SubLabel}" Margin="0,0,0,6" />
+            <Entry
+                Text="{Binding Password}"
+                Placeholder="••••••••"
+                IsPassword="True"
+                ReturnType="Go"
+                ReturnCommand="{Binding LoginCommand}"
+                Margin="0,0,0,24" />
+
+            <!-- Error message -->
+            <Label
+                Text="{Binding ErrorText}"
+                TextColor="{StaticResource AccentColor}"
+                FontSize="13"
+                IsVisible="{Binding ErrorText, Converter={x:StaticResource StringNotEmptyConverter}}"
+                Margin="0,0,0,12" />
+
+            <!-- Sign In button -->
+            <Button
+                Text="Sign In"
+                Command="{Binding LoginCommand}"
+                Style="{StaticResource PrimaryButton}"
+                IsEnabled="{Binding IsNotBusy}" />
+
+            <!-- Activity indicator -->
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}"
+                Margin="0,16,0,0"
+                HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

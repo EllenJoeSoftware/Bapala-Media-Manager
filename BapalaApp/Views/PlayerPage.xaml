@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="BapalaApp.Views.PlayerPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:BapalaApp.ViewModels"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:DataType="vm:PlayerViewModel"
+    Title="{Binding Title}"
+    BackgroundColor="{StaticResource BgColor}"
+    Shell.NavBarIsVisible="True">
+
+    <Grid RowDefinitions="Auto, *">
+
+        <!-- ── Video player ────────────────────────────────────────────────── -->
+        <toolkit:MediaElement
+            x:Name="mediaElement"
+            Grid.Row="0"
+            Source="{Binding StreamUrl}"
+            ShouldAutoPlay="True"
+            ShouldShowPlaybackControls="True"
+            Aspect="AspectFit"
+            BackgroundColor="Black"
+            HeightRequest="220"
+            HorizontalOptions="Fill"
+            PositionChanged="OnPositionChanged"
+            MediaEnded="OnMediaEnded" />
+
+        <!-- ── Metadata + actions below the player ─────────────────────────── -->
+        <ScrollView Grid.Row="1" Padding="16">
+            <VerticalStackLayout Spacing="12">
+
+                <!-- Loading state -->
+                <ActivityIndicator
+                    IsRunning="{Binding IsBusy}"
+                    IsVisible="{Binding IsBusy}"
+                    Margin="0,32"
+                    HorizontalOptions="Center" />
+
+                <!-- Title -->
+                <Label
+                    Text="{Binding Media.Title}"
+                    FontSize="20"
+                    FontAttributes="Bold"
+                    TextColor="{StaticResource TextColor}"
+                    IsVisible="{Binding IsNotBusy}" />
+
+                <!-- Year · Type · Rating -->
+                <Label
+                    Text="{Binding Media.DisplayMeta}"
+                    Style="{StaticResource SubLabel}"
+                    IsVisible="{Binding IsNotBusy}" />
+
+                <Label
+                    Text="{Binding Media.RatingDisplay}"
+                    TextColor="{StaticResource AccentColor}"
+                    FontSize="14"
+                    IsVisible="{Binding Media.Rating, Converter={x:StaticResource NotNullConverter}}" />
+
+                <!-- Genres -->
+                <Label
+                    Text="{Binding Media.GenresDisplay}"
+                    Style="{StaticResource SubLabel}"
+                    IsVisible="{Binding Media.Genres, Converter={x:StaticResource StringNotEmptyConverter}}" />
+
+                <!-- Separator -->
+                <BoxView
+                    HeightRequest="1"
+                    Color="#333"
+                    IsVisible="{Binding HasDescription}" />
+
+                <!-- Description -->
+                <Label
+                    Text="{Binding Media.Description}"
+                    FontSize="14"
+                    TextColor="{StaticResource Text2Color}"
+                    LineBreakMode="WordWrap"
+                    IsVisible="{Binding HasDescription}" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

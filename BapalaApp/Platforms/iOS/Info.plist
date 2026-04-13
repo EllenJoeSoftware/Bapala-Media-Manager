@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <key>UIDeviceFamily</key>
+    <array><integer>1</integer><integer>2</integer></array>
+
+    <key>UIRequiredDeviceCapabilities</key>
+    <array><string>arm64</string></array>
+
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+        <key>UISceneConfigurations</key>
+        <dict/>
+    </dict>
+
+    <!--
+        Allow HTTP connections to the local Bapala server.
+        NSAllowsArbitraryLoads is intentionally limited to local networking.
+        For internet-facing servers, switch to HTTPS and remove this key.
+    -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
+
+    <!-- Microphone / camera not needed; declare only video usage -->
+    <key>NSCameraUsageDescription</key>
+    <string>Camera not used by Bapala.</string>
+
+</dict>
+</plist>

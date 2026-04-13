@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="BapalaApp.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:views="clr-namespace:BapalaApp.Views"
+    Shell.FlyoutBehavior="Disabled"
+    BackgroundColor="{StaticResource SurfaceColor}"
+    ForegroundColor="{StaticResource TextColor}"
+    TitleColor="{StaticResource TextColor}"
+    UnselectedColor="{StaticResource Text2Color}"
+    TabBarBackgroundColor="{StaticResource SurfaceColor}"
+    TabBarForegroundColor="{StaticResource AccentColor}"
+    TabBarUnselectedColor="{StaticResource Text2Color}"
+    TabBarTitleColor="{StaticResource TextColor}">
+
+    <TabBar>
+        <ShellContent
+            Title="Library"
+            Icon="library.png"
+            Route="library"
+            ContentTemplate="{DataTemplate views:LibraryPage}" />
+    </TabBar>
+
+    <!-- PlayerPage is pushed on top of the shell, not a tab -->
+
+</Shell>

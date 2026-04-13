@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- Bapala dark-theme palette — mirrors the web app CSS variables -->
+    <Color x:Key="BgColor">#0f0f0f</Color>
+    <Color x:Key="SurfaceColor">#1a1a1a</Color>
+    <Color x:Key="Surface2Color">#242424</Color>
+    <Color x:Key="AccentColor">#e50914</Color>
+    <Color x:Key="TextColor">#e5e5e5</Color>
+    <Color x:Key="Text2Color">#aaaaaa</Color>
+    <Color x:Key="DangerColor">#5a0000</Color>
+    <Color x:Key="TransparentAccentColor">#33e50914</Color>
+
+</ResourceDictionary>

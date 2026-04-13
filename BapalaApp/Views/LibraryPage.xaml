@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="BapalaApp.Views.LibraryPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:BapalaApp.ViewModels"
+    xmlns:models="clr-namespace:BapalaApp.Models"
+    x:DataType="vm:LibraryViewModel"
+    Title="Bapala"
+    BackgroundColor="{StaticResource BgColor}">
+
+    <Shell.TitleView>
+        <Label
+            Text="Bapala"
+            FontSize="22"
+            FontAttributes="Bold"
+            TextColor="{StaticResource AccentColor}"
+            VerticalOptions="Center"
+            Margin="8,0" />
+    </Shell.TitleView>
+
+    <Grid RowDefinitions="Auto, Auto, *, Auto">
+
+        <!-- ── Row 0: Search bar ─────────────────────────────────────────── -->
+        <SearchBar
+            Grid.Row="0"
+            Text="{Binding SearchText}"
+            Placeholder="Search titles…"
+            SearchCommand="{Binding SearchCommand}"
+            BackgroundColor="{StaticResource SurfaceColor}"
+            Margin="0" />
+
+        <!-- ── Row 1: Filter chips ───────────────────────────────────────── -->
+        <ScrollView
+            Grid.Row="1"
+            Orientation="Horizontal"
+            HorizontalScrollBarVisibility="Never"
+            BackgroundColor="{StaticResource SurfaceColor}"
+            Padding="12,8">
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="All"          Command="{Binding ClearFiltersCommand}"           Style="{Binding AllActive,       Converter={x:StaticResource BoolToChipStyleConverter}}" />
+                <Button Text="Movies"       Command="{Binding SetFilterCommand}" CommandParameter="Movie"       Style="{Binding MoviesActive,    Converter={x:StaticResource BoolToChipStyleConverter}}" />
+                <Button Text="Series"       Command="{Binding SetFilterCommand}" CommandParameter="Series"      Style="{Binding SeriesActive,    Converter={x:StaticResource BoolToChipStyleConverter}}" />
+                <Button Text="Docs"         Command="{Binding SetFilterCommand}" CommandParameter="Documentary" Style="{Binding DocsActive,      Converter={x:StaticResource BoolToChipStyleConverter}}" />
+                <Button Text="Education"    Command="{Binding SetFilterCommand}" CommandParameter="Education"   Style="{Binding EducationActive, Converter={x:StaticResource BoolToChipStyleConverter}}" />
+                <Button Text="Music"        Command="{Binding SetFilterCommand}" CommandParameter="MusicVideo"  Style="{Binding MusicActive,     Converter={x:StaticResource BoolToChipStyleConverter}}" />
+                <Button Text="♥ Favorites"  Command="{Binding ToggleFavoritesCommand}"        Style="{Binding FavoritesActive, Converter={x:StaticResource BoolToChipStyleConverter}}" />
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <!-- ── Row 2: Media grid ─────────────────────────────────────────── -->
+        <RefreshView
+            Grid.Row="2"
+            Command="{Binding RefreshCommand}"
+            IsRefreshing="{Binding IsRefreshing}">
+
+            <CollectionView
+                ItemsSource="{Binding Items}"
+                SelectionMode="None"
+                EmptyView="No media found. Try scanning or adjusting filters."
+                EmptyViewTemplate="{x:Null}">
+
+                <CollectionView.ItemsLayout>
+                    <GridItemsLayout
+                        Orientation="Vertical"
+                        Span="2"
+                        HorizontalItemSpacing="8"
+                        VerticalItemSpacing="8" />
+                </CollectionView.ItemsLayout>
+
+                <CollectionView.Header>
+                    <ActivityIndicator
+                        IsRunning="{Binding IsBusy}"
+                        IsVisible="{Binding IsBusy}"
+                        Margin="0,16"
+                        HorizontalOptions="Center" />
+                </CollectionView.Header>
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:MediaItem">
+                        <Grid Padding="4">
+                            <!-- Outer tap → play -->
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, Path=PlayCommand}"
+                                    CommandParameter="{Binding .}" />
+                            </Grid.GestureRecognizers>
+
+                            <Border Style="{StaticResource CardFrame}">
+                                <Grid RowDefinitions="200, Auto">
+
+                                    <!-- Poster image -->
+                                    <Image
+                                        Grid.Row="0"
+                                        Source="{Binding PosterPath}"
+                                        Aspect="AspectFill"
+                                        BackgroundColor="{StaticResource Surface2Color}">
+                                        <Image.Source>
+                                            <UriImageSource
+                                                Uri="{Binding PosterPath}"
+                                                CacheValidity="7.00:00:00" />
+                                        </Image.Source>
+                                    </Image>
+
+                                    <!-- Overlay: favorite button top-right -->
+                                    <Button
+                                        Grid.Row="0"
+                                        Text="{Binding FavIcon}"
+                                        TextColor="{StaticResource AccentColor}"
+                                        BackgroundColor="#99000000"
+                                        CornerRadius="16"
+                                        Padding="6,2"
+                                        FontSize="16"
+                                        WidthRequest="36"
+                                        HeightRequest="36"
+                                        VerticalOptions="Start"
+                                        HorizontalOptions="End"
+                                        Margin="6"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LibraryViewModel}}, Path=ToggleItemFavoriteCommand}"
+                                        CommandParameter="{Binding .}" />
+
+                                    <!-- Title + meta below poster -->
+                                    <VerticalStackLayout Grid.Row="1" Padding="8,6,8,8" Spacing="3">
+                                        <Label
+                                            Text="{Binding Title}"
+                                            FontSize="13"
+                                            FontAttributes="Bold"
+                                            TextColor="{StaticResource TextColor}"
+                                            LineBreakMode="TailTruncation"
+                                            MaxLines="2" />
+                                        <Label
+                                            Text="{Binding DisplayMeta}"
+                                            Style="{StaticResource SubLabel}" />
+                                        <Label
+                                            Text="{Binding RatingDisplay}"
+                                            TextColor="{StaticResource AccentColor}"
+                                            FontSize="11"
+                                            IsVisible="{Binding Rating, Converter={x:StaticResource NotNullConverter}}" />
+                                    </VerticalStackLayout>
+
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- ── Row 3: Pagination ─────────────────────────────────────────── -->
+        <Grid
+            Grid.Row="3"
+            ColumnDefinitions="Auto,*,Auto"
+            Padding="16,8"
+            BackgroundColor="{StaticResource SurfaceColor}"
+            IsVisible="{Binding TotalItems, Converter={x:StaticResource GreaterThanZeroConverter}}">
+
+            <Button
+                Grid.Column="0"
+                Text="← Prev"
+                Command="{Binding PreviousPageCommand}"
+                IsEnabled="{Binding HasPreviousPage}"
+                Style="{StaticResource ChipButton}" />
+
+            <Label
+                Grid.Column="1"
+                Text="{Binding PageLabel}"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                FontSize="12"
+                TextColor="{StaticResource Text2Color}" />
+
+            <Button
+                Grid.Column="2"
+                Text="Next →"
+                Command="{Binding NextPageCommand}"
+                IsEnabled="{Binding HasNextPage}"
+                Style="{StaticResource ChipButton}" />
+        </Grid>
+
+    </Grid>
+</ContentPage>
