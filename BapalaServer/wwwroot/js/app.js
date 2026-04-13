@@ -1,4 +1,25 @@
-let state = { page: 1, limit: 20, type: null, genre: null, search: '', favorites: false, total: 0, viewMode: 'grid', sortBy: 'dateAdded', sortDesc: true };
+// ── Persisted preferences (survive page refresh) ─────────────────────────────
+function loadPrefs() {
+  try { return JSON.parse(localStorage.getItem('bapala_prefs') || '{}'); } catch { return {}; }
+}
+function savePrefs() {
+  localStorage.setItem('bapala_prefs', JSON.stringify({
+    type:     state.type,
+    viewMode: state.viewMode,
+    sortBy:   state.sortBy,
+    sortDesc: state.sortDesc,
+  }));
+}
+
+const _prefs = loadPrefs();
+let state = {
+  page: 1, limit: 20,
+  type:     _prefs.type     ?? null,
+  genre: null, search: '', favorites: false, total: 0,
+  viewMode: _prefs.viewMode ?? 'grid',
+  sortBy:   _prefs.sortBy   ?? 'dateAdded',
+  sortDesc: _prefs.sortDesc ?? true,
+};
 let editingId = null;
 let selectMode = false;
 let selectedIds = new Set();
@@ -474,6 +495,7 @@ function syncAllBtn() {
 
 function clearFilters() {
   state.type = null; state.favorites = false; state.page = 1;
+  savePrefs();
   document.querySelectorAll('.filter-btn[data-type]').forEach(b => b.classList.remove('active'));
   document.getElementById('favBtn').classList.remove('active');
   loadMedia();
@@ -482,6 +504,7 @@ function clearFilters() {
 function setFilter(type) {
   state.type = state.type === type ? null : type;
   state.page = 1;
+  savePrefs();
   document.querySelectorAll('.filter-btn[data-type]').forEach(b =>
     b.classList.toggle('active', b.dataset.type === state.type));
   loadMedia();
@@ -499,6 +522,7 @@ function toggleView() {
   const btn = document.getElementById('viewBtn');
   btn.textContent = state.viewMode === 'grid' ? '☰ List' : '⊞ Grid';
   btn.classList.toggle('active', state.viewMode === 'list');
+  savePrefs();
   loadMedia();
 }
 
@@ -520,6 +544,7 @@ function setSort(field) {
     state.sortDesc = field === 'dateAdded'; // date desc by default, others asc
   }
   state.page = 1;
+  savePrefs();
   syncSortButtons();
   loadMedia();
 }
@@ -600,5 +625,17 @@ function showToast(msg, duration = 3500) {
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('show'), duration);
 }
+
+// Sync UI controls to restored state on first load
+(function syncInitialState() {
+  // section filter buttons
+  document.querySelectorAll('.filter-btn[data-type]').forEach(b =>
+    b.classList.toggle('active', b.dataset.type === state.type));
+  document.getElementById('allBtn').classList.toggle('active', !state.type);
+  // view mode button
+  const vBtn = document.getElementById('viewBtn');
+  vBtn.textContent = state.viewMode === 'grid' ? '☰ List' : '⊞ Grid';
+  vBtn.classList.toggle('active', state.viewMode === 'list');
+})();
 
 loadMedia();
