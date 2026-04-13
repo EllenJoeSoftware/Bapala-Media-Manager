@@ -12,7 +12,18 @@
   <div class="spacer"></div>
 </nav>
 <div class="player-wrap">
-  <video id="vid" controls preload="metadata"></video>
+  <div class="video-container">
+    <video id="vid" controls preload="metadata"></video>
+    <!-- Resume banner — shown when a saved position exists -->
+    <div class="resume-banner" id="resumeBanner" style="display:none" role="dialog" aria-label="Resume playback">
+      <div class="resume-inner">
+        <span class="resume-icon">⏱</span>
+        <span>Resume from <strong id="resumeTime"></strong>?</span>
+        <button class="btn resume-yes" id="resumeYes">Resume</button>
+        <button class="filter-btn resume-no" id="resumeNo">Start Over</button>
+      </div>
+    </div>
+  </div>
   <div class="player-meta">
     <h1 id="title">Loading…</h1>
     <div class="sub" id="meta"></div>

@@ -164,3 +164,20 @@ body.select-mode .card-check { display: flex; }
 }
 .sort-label { color: var(--text2); font-size: .8rem; margin-right: 4px; }
 .sort-bar .filter-btn { border-radius: 6px; font-size: .8rem; padding: 5px 12px; }
+
+/* ── Player: video container + resume banner ─────────────────────────────── */
+.video-container { position: relative; }
+
+.resume-banner {
+  position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+  z-index: 10; background: rgba(0,0,0,.88); border: 1px solid #444;
+  border-radius: 10px; padding: 14px 20px;
+  animation: fadeIn .25s;
+}
+.resume-inner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  font-size: .9rem; white-space: nowrap;
+}
+.resume-icon { font-size: 1.2rem; }
+.resume-yes  { width: auto; padding: 7px 18px; font-size: .85rem; }
+.resume-no   { padding: 7px 14px; font-size: .85rem; }
