@@ -10,9 +10,17 @@
     BackgroundColor="{StaticResource BgColor}"
     Shell.NavBarIsVisible="True">
 
-    <Grid RowDefinitions="Auto, *">
+    <Grid RowDefinitions="250, *">
 
-        <!-- ── Video player ────────────────────────────────────────────────── -->
+        <!-- ── Video player ────────────────────────────────────────────────────
+             Row height is fixed (250) so ExoPlayer has a real surface to render
+             into from the very first layout pass. "Auto" causes ExoPlayer to get
+             a 0×0 canvas before video metadata arrives — resulting in a white
+             blank box that never fills in.
+
+             MediaFailed is wired to code-behind so stream errors are surfaced
+             as visible text instead of silent white.
+        ─────────────────────────────────────────────────────────────────────── -->
         <toolkit:MediaElement
             x:Name="mediaElement"
             Grid.Row="0"
@@ -21,12 +29,26 @@
             ShouldShowPlaybackControls="True"
             Aspect="AspectFit"
             BackgroundColor="Black"
-            HeightRequest="220"
             HorizontalOptions="Fill"
+            VerticalOptions="Fill"
             PositionChanged="OnPositionChanged"
-            MediaEnded="OnMediaEnded" />
+            MediaEnded="OnMediaEnded"
+            MediaFailed="OnMediaFailed"
+            StateChanged="OnMediaStateChanged" />
 
-        <!-- ── Metadata + actions below the player ─────────────────────────── -->
+        <!-- Stream error overlay (only visible when stream fails) -->
+        <Label
+            Grid.Row="0"
+            Text="{Binding StreamError}"
+            TextColor="{StaticResource AccentColor}"
+            FontSize="13"
+            HorizontalOptions="Center"
+            VerticalOptions="Center"
+            HorizontalTextAlignment="Center"
+            Margin="16"
+            IsVisible="{Binding HasStreamError}" />
+
+        <!-- ── Metadata + actions ─────────────────────────────────────────── -->
         <ScrollView Grid.Row="1" Padding="16">
             <VerticalStackLayout Spacing="12">
 

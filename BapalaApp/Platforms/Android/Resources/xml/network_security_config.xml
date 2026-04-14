@@ -1,20 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Allows cleartext HTTP traffic to local network hosts.
-    The Bapala server runs on HTTP (not HTTPS) by default on the local LAN.
-    This is safe because the traffic never leaves the private network.
-    Replace with HTTPS + a proper certificate for internet-facing deployments.
+    Allows cleartext HTTP for connections to the local Bapala media server.
+
+    The <domain> element matches domain name strings only — IP addresses are NOT
+    valid values (192.168.1.0 is treated as the literal hostname "192.168.1.0",
+    not as a subnet). Since this app connects to an arbitrary LAN IP chosen by
+    the user, the only correct approach is base-config cleartext permission.
+
+    This is safe: the app is designed for private LAN use; traffic never leaves
+    the home network. For an internet-facing deployment, switch the server to
+    HTTPS and remove this file (Android 9+ defaults to cleartext=false).
 -->
 <network-security-config>
-    <!-- Trust system CAs for all other traffic -->
-    <base-config cleartextTrafficPermitted="false" />
-
-    <!-- Allow HTTP to private / LAN IP ranges -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">192.168.1.0</domain>
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">172.16.0.0</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

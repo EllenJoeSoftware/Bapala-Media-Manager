@@ -97,7 +97,13 @@ public class BapalaApiService
             ServerUrl    = url;
             _cachedToken = data.Token;
             Preferences.Set("bapala_server_url", url);
-            await SecureStorage.SetAsync("bapala_jwt", data.Token);
+            // SecureStorage can throw on Android if the KeyStore is unavailable
+            // (e.g. no device lock screen configured). Catch so a storage failure
+            // does not abort a login that otherwise succeeded — the token is still
+            // cached in memory for this session; the user will need to log in again
+            // next launch.
+            try { await SecureStorage.SetAsync("bapala_jwt", data.Token); }
+            catch { /* best-effort persistence — session token still works */ }
 
             _http.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", data.Token);

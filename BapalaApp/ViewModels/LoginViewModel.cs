@@ -7,16 +7,18 @@ namespace BapalaApp.ViewModels;
 public partial class LoginViewModel : BaseViewModel
 {
     private readonly BapalaApiService _api;
+    private readonly IServiceProvider _services;
 
     [ObservableProperty] private string _serverUrl = "http://";
     [ObservableProperty] private string _username  = "admin";
     [ObservableProperty] private string _password  = string.Empty;
     [ObservableProperty] private string _errorText = string.Empty;
 
-    public LoginViewModel(BapalaApiService api)
+    public LoginViewModel(BapalaApiService api, IServiceProvider services)
     {
-        _api = api;
-        Title = "Sign In";
+        _api      = api;
+        _services = services;
+        Title     = "Sign In";
 
         // Pre-fill server URL from previous session
         var saved = Preferences.Get("bapala_server_url", string.Empty);
@@ -43,12 +45,31 @@ public partial class LoginViewModel : BaseViewModel
             var (success, error, _) = await _api.LoginAsync(ServerUrl, Username, Password);
 
             if (!success)
-            { ErrorText = error ?? "Login failed."; return; }
+            {
+                ErrorText = error ?? "Login failed.";
+                return;
+            }
 
-            // Replace root page — use Windows[0].Page (MAUI .NET 9 pattern)
-            // so Back cannot navigate back to the login screen.
-            if (Application.Current?.Windows.Count > 0)
-                Application.Current.Windows[0].Page = new AppShell();
+            // Login succeeded — swap the root page to AppShell.
+            // Wrapped separately because a navigation failure is a different
+            // problem from a network/auth failure.
+            try
+            {
+                if (Application.Current?.Windows.Count > 0)
+                    Application.Current.Windows[0].Page =
+                        _services.GetRequiredService<AppShell>();
+            }
+            catch (Exception navEx)
+            {
+                ErrorText = $"Navigation failed: {navEx.GetType().Name}: {navEx.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            // CommunityToolkit AsyncRelayCommand swallows unhandled exceptions by
+            // default — they disappear silently. Catch everything here so the user
+            // always sees what went wrong instead of a silent no-op.
+            ErrorText = $"Sign-in error ({ex.GetType().Name}): {ex.Message}";
         }
         finally
         {

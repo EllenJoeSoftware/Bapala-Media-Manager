@@ -19,6 +19,23 @@
     <!-- Minimum OS versions -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+
+    <!--
+      Embed all .NET assemblies directly inside the APK.
+
+      By default, Debug builds use "Fast Deployment": assemblies are pushed to
+      the device's private storage (/data/.../files/__override__/) by the IDE
+      or 'dotnet run' pipeline, NOT included in the APK file itself.  If you
+      install the APK manually (copy the file, no ADB deploy step), the runtime
+      finds an empty __override__ folder and hard-aborts with SIGABRT:
+        "No assemblies found in '.../__override__/arm64-v8a'. Exiting..."
+
+      EmbedAssembliesIntoApk=true makes the APK fully self-contained so it can
+      be installed on any device without a paired ADB deploy.  The trade-off is
+      a longer build and a larger APK — acceptable for manual sideloading.
+      Release builds always embed; this property just extends that to Debug too.
+    -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>
 
   <ItemGroup>

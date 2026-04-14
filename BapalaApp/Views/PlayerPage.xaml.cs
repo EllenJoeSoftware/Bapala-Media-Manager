@@ -19,8 +19,6 @@ public partial class PlayerPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-
-        // Seek to saved position once the media has loaded its metadata
         _vm.PropertyChanged += OnViewModelPropertyChanged;
         _vm.StartSaveTimer();
     }
@@ -50,6 +48,24 @@ public partial class PlayerPage : ContentPage
                 mediaElement.SeekTo(TimeSpan.FromSeconds(_vm.ResumePosition));
             });
         }
+
+        // When the StreamUrl arrives (set after async metadata load), ensure the
+        // MediaElement is actually playing.  On some Android devices / MIUI, the
+        // auto-play binding fires before the ExoPlayer surface is ready, so the
+        // player ends up paused at 0:00 with a black/white frame.
+        if (e.PropertyName == nameof(PlayerViewModel.StreamUrl) &&
+            !string.IsNullOrEmpty(_vm.StreamUrl))
+        {
+            // Small delay so ExoPlayer can attach its SurfaceTexture to the view
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
+            {
+                if (mediaElement.CurrentState is not
+                    (MediaElementState.Playing or MediaElementState.Buffering))
+                {
+                    mediaElement.Play();
+                }
+            });
+        }
     }
 
     // ── MediaElement event handlers ───────────────────────────────────────────
@@ -62,4 +78,33 @@ public partial class PlayerPage : ContentPage
     }
 
     private void OnMediaEnded(object? sender, EventArgs e) => _vm.OnPlaybackStopped();
+
+    /// <summary>
+    /// Called by ExoPlayer when the stream cannot be opened or decoded.
+    /// Surfaces the error as visible text so the user knows why the screen is blank.
+    /// Common causes: 401 Unauthorized (token expired), unreachable server URL,
+    /// unsupported video codec, or a network drop mid-stream.
+    /// </summary>
+    private void OnMediaFailed(object? sender, MediaFailedEventArgs e)
+    {
+        _vm.SetStreamError($"Stream error: {e.ErrorMessage}");
+    }
+
+    /// <summary>
+    /// Tracks ExoPlayer state transitions for debugging.
+    /// On MIUI and some custom ROMs, the state can briefly enter
+    /// 'Stopped' right after source is set — we nudge Play() in that case.
+    /// </summary>
+    private void OnMediaStateChanged(object? sender, MediaStateChangedEventArgs e)
+    {
+        // If ExoPlayer enters Stopped state immediately after receiving a source
+        // (happens on some MIUI builds), kick it into playing mode.
+        if (e.NewState == MediaElementState.Stopped &&
+            !string.IsNullOrEmpty(_vm.StreamUrl) &&
+            _vm.StreamError == null)
+        {
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(200), () =>
+                mediaElement.Play());
+        }
+    }
 }
