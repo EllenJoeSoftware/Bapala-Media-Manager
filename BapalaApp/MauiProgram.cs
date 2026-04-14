@@ -32,6 +32,10 @@ public static class MauiProgram
         builder.Services.AddTransient<PlayerViewModel>();
 
         // ── Views ─────────────────────────────────────────────────────────────
+        // Register AppShell so it can be resolved from DI — avoids the Shell
+        // DataTemplate calling Activator.CreateInstance on pages that have no
+        // parameterless constructor.
+        builder.Services.AddTransient<AppShell>();
         builder.Services.AddTransient<LoginPage>();
         builder.Services.AddTransient<LibraryPage>();
         builder.Services.AddTransient<PlayerPage>();

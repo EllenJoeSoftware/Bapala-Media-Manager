@@ -3,7 +3,6 @@
     x:Class="BapalaApp.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:views="clr-namespace:BapalaApp.Views"
     Shell.FlyoutBehavior="Disabled"
     BackgroundColor="{StaticResource SurfaceColor}"
     ForegroundColor="{StaticResource TextColor}"
@@ -15,10 +14,13 @@
     TabBarTitleColor="{StaticResource TextColor}">
 
     <TabBar>
+        <!-- Content is set from code-behind via DI (AppShell.xaml.cs) so that
+             MAUI never calls Activator.CreateInstance on LibraryPage, which has
+             no parameterless constructor. -->
         <ShellContent
+            x:Name="LibraryContent"
             Title="Library"
-            Route="library"
-            ContentTemplate="{DataTemplate views:LibraryPage}" />
+            Route="library" />
     </TabBar>
 
     <!-- PlayerPage is pushed on top of the shell, not a tab -->
