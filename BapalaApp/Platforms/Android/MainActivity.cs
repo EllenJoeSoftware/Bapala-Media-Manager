@@ -18,20 +18,35 @@ public class MainActivity : MauiAppCompatActivity
     {
         base.OnCreate(savedInstanceState);
 
-        // Always show focus highlights — critical for TV remote navigation.
-        // On touch-only devices Android hides focus rings after first touch;
-        // TV remotes never trigger touch events so the ring never appears unless we force it.
-        Window?.DecorView?.SetFocusable(ViewFocusability.Focusable);
+        // Force focus to always be visible — essential for TV D-pad navigation.
+        // On touch devices Android suppresses focus rings after first touch event,
+        // but TV remotes never fire touch events so without this the ring never shows.
+        // SetDefaultFocusHighlightEnabled is not in the MAUI bindings so we call it
+        // via JNI on the underlying Java View object.
+        var decorView = Window?.DecorView;
+        if (decorView != null)
+        {
+            decorView.SetFocusable(ViewFocusability.Focusable);
 
-#pragma warning disable CA1422
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
-            Window?.DecorView?.SetDefaultFocusHighlightEnabled(true);
-#pragma warning restore CA1422
+            // Call the Java method directly via JNI — available from API 26+
+            if (OperatingSystem.IsAndroidVersionAtLeast(26))
+            {
+                try
+                {
+                    var method = decorView.Class?.GetDeclaredMethod(
+                        "setDefaultFocusHighlightEnabled", Java.Lang.Boolean.Type!);
+                    method?.Invoke(decorView, Java.Lang.Boolean.True);
+                }
+                catch
+                {
+                    // Non-fatal — XAML VisualStates still provide focus highlight
+                }
+            }
+        }
     }
 
     public override bool OnKeyDown(Keycode keyCode, KeyEvent? e)
     {
-        // Forward D-pad / media keys so MAUI can handle navigation and playback
         return base.OnKeyDown(keyCode, e);
     }
 }
