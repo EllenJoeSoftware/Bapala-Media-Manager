@@ -51,8 +51,12 @@
     <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
     <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.120" />
     <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
-    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="4.1.2" />
+    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="6.0.2" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <!-- Required by MediaElement v6 on Android — ExoPlayer via AndroidX Media3 -->
+    <PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.5.1.1" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
+    <PackageReference Include="Xamarin.AndroidX.Media3.UI" Version="1.5.1.1" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
+    <PackageReference Include="Xamarin.AndroidX.LocalBroadcastManager" Version="1.1.0.8" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'" />
     <!-- SignalR client for real-time TMDB refresh progress -->
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.0" />
   </ItemGroup>

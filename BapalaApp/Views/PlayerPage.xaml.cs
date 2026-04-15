@@ -7,8 +7,6 @@ namespace BapalaApp.Views;
 public partial class PlayerPage : ContentPage
 {
     private readonly PlayerViewModel _vm;
-    private bool _surfaceReady;   // true once ExoPlayer's Android surface is attached
-    private bool _urlPending;     // true if a URL arrived before the surface was ready
 
     public PlayerPage(PlayerViewModel vm)
     {
@@ -23,6 +21,10 @@ public partial class PlayerPage : ContentPage
         base.OnAppearing();
         _vm.PropertyChanged += OnViewModelPropertyChanged;
         _vm.StartSaveTimer();
+
+        // Set source now if the URL is already loaded (fast devices / cached data)
+        if (!string.IsNullOrEmpty(_vm.StreamUrl))
+            ApplySource(_vm.StreamUrl);
     }
 
     protected override void OnDisappearing()
@@ -33,71 +35,66 @@ public partial class PlayerPage : ContentPage
         _vm.OnPlaybackStopped();
         _vm.PropertyChanged -= OnViewModelPropertyChanged;
 
-        // Stop and release the MediaElement to free the decoder hardware
         mediaElement.Stop();
         mediaElement.Handler?.DisconnectHandler();
     }
 
-    // ── Resume at saved position ──────────────────────────────────────────────
+    // ── ViewModel property changes ────────────────────────────────────────────
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        // Resume position — seek after a short delay so the player has had time to load
         if (e.PropertyName == nameof(PlayerViewModel.ResumePosition) && _vm.ResumePosition > 30)
         {
-            // Seek after a short delay so the media element has had time to load
-            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(500), () =>
-            {
-                mediaElement.SeekTo(TimeSpan.FromSeconds(_vm.ResumePosition));
-            });
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(800), () =>
+                mediaElement.SeekTo(TimeSpan.FromSeconds(_vm.ResumePosition)));
         }
 
-        // When the StreamUrl arrives from the async API call, either load it
-        // immediately (surface already ready) or set a pending flag so
-        // OnMediaHandlerChanged picks it up when the surface attaches.
+        // URL arrived from async API call — apply it
         if (e.PropertyName == nameof(PlayerViewModel.StreamUrl) &&
             !string.IsNullOrEmpty(_vm.StreamUrl))
         {
-            if (_surfaceReady)
-                LoadAndPlay(_vm.StreamUrl);
-            else
-                _urlPending = true;
+            ApplySource(_vm.StreamUrl);
         }
     }
 
-    // ── MediaElement event handlers ───────────────────────────────────────────
+    // ── Source loading ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Fires when ExoPlayer's native Android handler (SurfaceTexture) is attached
-    /// to the view. This is the earliest safe moment to set a Source on Android —
-    /// setting it before this point gives ExoPlayer a null surface which results
-    /// in audio-only playback with a white video frame.
+    /// Sets the Source on the MediaElement and starts playback.
+    /// We do NOT bind Source in XAML because ExoPlayer needs the view to be
+    /// fully laid out before it can attach its SurfaceTexture.  Setting Source
+    /// from code-behind after OnAppearing gives the layout pass time to complete.
     /// </summary>
-    private void OnMediaHandlerChanged(object? sender, EventArgs e)
+    private void ApplySource(string url)
     {
-        if (mediaElement.Handler == null) return;   // handler detaching — ignore
-
-        _surfaceReady = true;
-
-        if (_urlPending && !string.IsNullOrEmpty(_vm.StreamUrl))
+        // 200 ms delay lets ExoPlayer finish attaching its SurfaceTexture
+        // on slower/older Android devices before we hand it the stream URL.
+        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(200), () =>
         {
-            _urlPending = false;
-            LoadAndPlay(_vm.StreamUrl);
-        }
-    }
-
-    /// <summary>
-    /// Sets the MediaElement Source and starts playback.
-    /// Always called after the surface is confirmed ready.
-    /// </summary>
-    private void LoadAndPlay(string url)
-    {
-        // Small delay gives ExoPlayer one more layout pass to fully bind
-        // the SurfaceTexture on slower/older devices before we hand it the URL.
-        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(150), () =>
-        {
-            mediaElement.Source = MediaSource.FromUri(url);
-            mediaElement.Play();
+            try
+            {
+                mediaElement.Source = MediaSource.FromUri(url);
+                mediaElement.Play();
+            }
+            catch (Exception ex)
+            {
+                _vm.SetStreamError($"Player init error: {ex.Message}");
+            }
         });
+    }
+
+    // ── MediaElement events ───────────────────────────────────────────────────
+
+    private void OnMediaOpened(object? sender, EventArgs e)
+    {
+        // Media opened successfully — seek to resume position if applicable
+        if (_vm.ResumePosition > 30)
+        {
+            var dur = mediaElement.Duration.TotalSeconds;
+            if (dur <= 0 || _vm.ResumePosition < dur - 30)
+                mediaElement.SeekTo(TimeSpan.FromSeconds(_vm.ResumePosition));
+        }
     }
 
     private void OnPositionChanged(object? sender, MediaPositionChangedEventArgs e)
@@ -109,26 +106,15 @@ public partial class PlayerPage : ContentPage
 
     private void OnMediaEnded(object? sender, EventArgs e) => _vm.OnPlaybackStopped();
 
-    /// <summary>
-    /// Called by ExoPlayer when the stream cannot be opened or decoded.
-    /// Surfaces the error as visible text so the user knows why the screen is blank.
-    /// Common causes: 401 Unauthorized (token expired), unreachable server URL,
-    /// unsupported video codec, or a network drop mid-stream.
-    /// </summary>
     private void OnMediaFailed(object? sender, MediaFailedEventArgs e)
     {
         _vm.SetStreamError($"Stream error: {e.ErrorMessage}");
     }
 
-    /// <summary>
-    /// Tracks ExoPlayer state transitions for debugging.
-    /// On MIUI and some custom ROMs, the state can briefly enter
-    /// 'Stopped' right after source is set — we nudge Play() in that case.
-    /// </summary>
     private void OnMediaStateChanged(object? sender, MediaStateChangedEventArgs e)
     {
-        // If ExoPlayer enters Stopped state immediately after receiving a source
-        // (happens on some MIUI builds), kick it into playing mode.
+        // On some Android ROMs ExoPlayer briefly enters Stopped right after
+        // source is set — nudge it back into playing.
         if (e.NewState == MediaElementState.Stopped &&
             !string.IsNullOrEmpty(_vm.StreamUrl) &&
             _vm.StreamError == null)
