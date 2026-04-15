@@ -18,9 +18,13 @@
 
     <!-- Minimum OS versions -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-    <!-- Build for all Android ABIs so the APK installs on ARM32 TV boxes,
-         ARM64 phones, and x86_64 emulators from a single APK file. -->
+    <!-- Build separate APKs per ABI — smaller files, each device gets only what it needs.
+         TV boxes:   armeabi-v7a (32-bit ARM)
+         Phones:     arm64-v8a   (64-bit ARM)
+         Emulators:  x86_64
+    -->
     <AndroidSupportedAbis Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">armeabi-v7a;arm64-v8a;x86_64</AndroidSupportedAbis>
+    <AndroidCreatePackagePerAbi Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">true</AndroidCreatePackagePerAbi>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 
     <!--
