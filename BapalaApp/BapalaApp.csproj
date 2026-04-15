@@ -1,13 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net9.0-android;net9.0-ios</TargetFrameworks>
-    <!-- RuntimeIdentifiers: list ALL platforms so the IDE and CI can restore correctly.
-         For split APKs, pass -r explicitly on the command line:
-           dotnet publish -f net9.0-android -r android-arm    (armeabi-v7a — TV boxes)
-           dotnet publish -f net9.0-android -r android-arm64  (arm64-v8a   — phones)
-           dotnet publish -f net9.0-android -r android-x64    (x86_64      — emulator)
-         The plain 'dotnet build' command uses the host default ABI only. -->
+    <!-- RuntimeIdentifiers: used by restore and IDE tooling -->
     <RuntimeIdentifiers>android-arm;android-arm64;android-x64;ios-arm64</RuntimeIdentifiers>
+
+    <!-- Produce one APK per ABI when publishing.
+         android-arm   → armeabi-v7a (TV boxes / older 32-bit ARM devices)
+         android-arm64 → arm64-v8a   (modern phones and tablets)
+         android-x64   → x86_64      (emulators)
+         Run:  dotnet publish -f net9.0-android -c Release
+         All three signed APKs will appear in bin/Release/net9.0-android/publish/ -->
+    <AndroidCreatePackagePerAbi Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">true</AndroidCreatePackagePerAbi>
+    <AndroidSupportedAbis Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">armeabi-v7a;arm64-v8a;x86_64</AndroidSupportedAbis>
     <OutputType>Exe</OutputType>
     <RootNamespace>BapalaApp</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -26,11 +30,7 @@
     <!-- Minimum OS versions -->
     <!-- MediaElement (CommunityToolkit) requires API 26+. API 26 = Android 8.0 (2017), covers all modern TV boxes. -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26.0</SupportedOSPlatformVersion>
-    <!-- Split APK per ABI via RuntimeIdentifiers (the .NET 9 supported approach).
-         AndroidSupportedAbis and AndroidCreatePackagePerAbi are deprecated and removed.
-         Build with: dotnet publish -f net9.0-android -r android-arm   (TV box)
-                                                       -r android-arm64 (phone)
-                                                       -r android-x64   (emulator) -->
+
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 
     <!--
