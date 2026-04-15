@@ -21,14 +21,13 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 
     <!-- Minimum OS versions -->
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-    <!-- Build separate APKs per ABI — smaller files, each device gets only what it needs.
-         TV boxes:   armeabi-v7a (32-bit ARM)
-         Phones:     arm64-v8a   (64-bit ARM)
-         Emulators:  x86_64
-    -->
-    <AndroidSupportedAbis Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">armeabi-v7a;arm64-v8a;x86_64</AndroidSupportedAbis>
-    <AndroidCreatePackagePerAbi Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">true</AndroidCreatePackagePerAbi>
+    <!-- MediaElement (CommunityToolkit) requires API 26+. API 26 = Android 8.0 (2017), covers all modern TV boxes. -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26.0</SupportedOSPlatformVersion>
+    <!-- Split APK per ABI via RuntimeIdentifiers (the .NET 9 supported approach).
+         AndroidSupportedAbis and AndroidCreatePackagePerAbi are deprecated and removed.
+         Build with: dotnet publish -f net9.0-android -r android-arm   (TV box)
+                                                       -r android-arm64 (phone)
+                                                       -r android-x64   (emulator) -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 
     <!--

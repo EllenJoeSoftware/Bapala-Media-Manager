@@ -127,16 +127,20 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
         {
             var tcs = new TaskCompletionSource<NsdServiceInfo?>();
             var listener = new ResolveListener(tcs);
+
+#pragma warning disable CA1422 // NsdManager.ResolveService obsoleted on API 34+; replacement only available 34+
             _nsd.ResolveService(serviceInfo, listener);
+#pragma warning restore CA1422
 
             // Give the OS up to 5 s to resolve the service
             var resolved = await Task.WhenAny(tcs.Task, Task.Delay(5_000)) == tcs.Task
                 ? await tcs.Task
                 : null;
 
+#pragma warning disable CA1422 // NsdServiceInfo.Host obsoleted on API 34+; replacement only available 34+
             if (resolved?.Host == null) return;
-
             var host   = resolved.Host.HostAddress ?? resolved.Host.ToString();
+#pragma warning restore CA1422
             var port   = resolved.Port;
             var name   = resolved.ServiceName ?? "Bapala Server";
             var server = new DiscoveredServer(name, host!, port);

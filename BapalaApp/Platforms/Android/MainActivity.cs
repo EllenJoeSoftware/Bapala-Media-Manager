@@ -29,7 +29,7 @@ public class MainActivity : MauiAppCompatActivity
 #pragma warning restore CA1422
     }
 
-    public override bool OnKeyDown([GeneratedEnum] Keycode keyCode, KeyEvent? e)
+    public override bool OnKeyDown(Keycode keyCode, KeyEvent? e)
     {
         // Forward D-pad / media keys so MAUI can handle navigation and playback
         return base.OnKeyDown(keyCode, e);
