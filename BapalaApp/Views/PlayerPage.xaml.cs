@@ -7,6 +7,8 @@ namespace BapalaApp.Views;
 public partial class PlayerPage : ContentPage
 {
     private readonly PlayerViewModel _vm;
+    private bool _surfaceReady;   // true once ExoPlayer's Android surface is attached
+    private bool _urlPending;     // true if a URL arrived before the surface was ready
 
     public PlayerPage(PlayerViewModel vm)
     {
@@ -49,26 +51,54 @@ public partial class PlayerPage : ContentPage
             });
         }
 
-        // When the StreamUrl arrives (set after async metadata load), ensure the
-        // MediaElement is actually playing.  On some Android devices / MIUI, the
-        // auto-play binding fires before the ExoPlayer surface is ready, so the
-        // player ends up paused at 0:00 with a black/white frame.
+        // When the StreamUrl arrives from the async API call, either load it
+        // immediately (surface already ready) or set a pending flag so
+        // OnMediaHandlerChanged picks it up when the surface attaches.
         if (e.PropertyName == nameof(PlayerViewModel.StreamUrl) &&
             !string.IsNullOrEmpty(_vm.StreamUrl))
         {
-            // Small delay so ExoPlayer can attach its SurfaceTexture to the view
-            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
-            {
-                if (mediaElement.CurrentState is not
-                    (MediaElementState.Playing or MediaElementState.Buffering))
-                {
-                    mediaElement.Play();
-                }
-            });
+            if (_surfaceReady)
+                LoadAndPlay(_vm.StreamUrl);
+            else
+                _urlPending = true;
         }
     }
 
     // ── MediaElement event handlers ───────────────────────────────────────────
+
+    /// <summary>
+    /// Fires when ExoPlayer's native Android handler (SurfaceTexture) is attached
+    /// to the view. This is the earliest safe moment to set a Source on Android —
+    /// setting it before this point gives ExoPlayer a null surface which results
+    /// in audio-only playback with a white video frame.
+    /// </summary>
+    private void OnMediaHandlerChanged(object? sender, EventArgs e)
+    {
+        if (mediaElement.Handler == null) return;   // handler detaching — ignore
+
+        _surfaceReady = true;
+
+        if (_urlPending && !string.IsNullOrEmpty(_vm.StreamUrl))
+        {
+            _urlPending = false;
+            LoadAndPlay(_vm.StreamUrl);
+        }
+    }
+
+    /// <summary>
+    /// Sets the MediaElement Source and starts playback.
+    /// Always called after the surface is confirmed ready.
+    /// </summary>
+    private void LoadAndPlay(string url)
+    {
+        // Small delay gives ExoPlayer one more layout pass to fully bind
+        // the SurfaceTexture on slower/older devices before we hand it the URL.
+        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(150), () =>
+        {
+            mediaElement.Source = MediaSource.FromUri(url);
+            mediaElement.Play();
+        });
+    }
 
     private void OnPositionChanged(object? sender, MediaPositionChangedEventArgs e)
     {
