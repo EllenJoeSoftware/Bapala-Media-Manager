@@ -92,7 +92,28 @@
                                     BackgroundColor="#252538"
                                     Stroke="#3A3A50"
                                     StrokeThickness="1"
-                                    StrokeShape="RoundRectangle 10">
+                                    StrokeShape="RoundRectangle 10"
+                                    IsTabStop="True">
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroupList>
+                                            <VisualStateGroup x:Name="CommonStates">
+                                                <VisualState x:Name="Normal">
+                                                    <VisualState.Setters>
+                                                        <Setter Property="Stroke" Value="#3A3A50" />
+                                                        <Setter Property="Scale"  Value="1.0" />
+                                                    </VisualState.Setters>
+                                                </VisualState>
+                                                <VisualState x:Name="Focused">
+                                                    <VisualState.Setters>
+                                                        <Setter Property="Stroke"          Value="{StaticResource FocusColor}" />
+                                                        <Setter Property="StrokeThickness" Value="3" />
+                                                        <Setter Property="Scale"           Value="1.03" />
+                                                        <Setter Property="BackgroundColor" Value="{StaticResource FocusBgColor}" />
+                                                    </VisualState.Setters>
+                                                </VisualState>
+                                            </VisualStateGroup>
+                                        </VisualStateGroupList>
+                                    </VisualStateManager.VisualStateGroups>
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:LoginViewModel}}, Path=SelectServerCommand}"
@@ -176,7 +197,7 @@
             <Button
                 Text="Sign In"
                 Command="{Binding LoginCommand}"
-                Style="{StaticResource PrimaryButton}"
+                Style="{StaticResource TvButton}"
                 IsEnabled="{Binding IsNotBusy}" />
 
             <!-- Activity indicator -->

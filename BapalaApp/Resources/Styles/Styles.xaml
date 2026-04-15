@@ -104,4 +104,77 @@
         <Setter Property="HorizontalOptions" Value="Center" />
     </Style>
 
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         TV / D-pad focus styles
+         These VisualStates fire automatically when the Android TV remote
+         moves focus onto any Button or Border that uses these styles.
+         The red border + tinted background make selection obvious at 3m.
+    ══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Base TV-focusable button — inherits PrimaryButton, adds focus glow -->
+    <Style x:Key="TvButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource FocusColor}" />
+                            <Setter Property="Scale"           Value="1.08" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="0.4" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- TV chip button — adds focus glow to chip style -->
+    <Style x:Key="TvChipButton" TargetType="Button" BasedOn="{StaticResource ChipButton}">
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Property="BackgroundColor" Value="{StaticResource FocusColor}" />
+                            <Setter Property="TextColor"       Value="White" />
+                            <Setter Property="Scale"           Value="1.08" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <!-- TV card — Border that shows a red stroke when D-pad selects it -->
+    <Style x:Key="TvCardFrame" TargetType="Border" BasedOn="{StaticResource CardFrame}">
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal">
+                        <VisualState.Setters>
+                            <Setter Property="Stroke"          Value="Transparent" />
+                            <Setter Property="StrokeThickness" Value="0" />
+                            <Setter Property="Scale"           Value="1.0" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Property="Stroke"          Value="{StaticResource FocusColor}" />
+                            <Setter Property="StrokeThickness" Value="3" />
+                            <Setter Property="Scale"           Value="1.05" />
+                            <Setter Property="BackgroundColor" Value="{StaticResource FocusBgColor}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

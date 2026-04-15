@@ -82,43 +82,43 @@
 
                 <Button Text="All"
                         Command="{Binding ClearFiltersCommand}"
-                        Style="{StaticResource ChipButton}"
+                        Style="{StaticResource TvChipButton}"
                         BackgroundColor="{Binding AllActive,       Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding AllActive,             Converter={x:StaticResource BoolToChipFgConverter}}" />
 
                 <Button Text="Movies"
                         Command="{Binding SetFilterCommand}" CommandParameter="Movie"
-                        Style="{StaticResource ChipButton}"
+                        Style="{StaticResource TvChipButton}"
                         BackgroundColor="{Binding MoviesActive,    Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding MoviesActive,          Converter={x:StaticResource BoolToChipFgConverter}}" />
 
                 <Button Text="Series"
                         Command="{Binding SetFilterCommand}" CommandParameter="Series"
-                        Style="{StaticResource ChipButton}"
+                        Style="{StaticResource TvChipButton}"
                         BackgroundColor="{Binding SeriesActive,    Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding SeriesActive,          Converter={x:StaticResource BoolToChipFgConverter}}" />
 
                 <Button Text="Docs"
                         Command="{Binding SetFilterCommand}" CommandParameter="Documentary"
-                        Style="{StaticResource ChipButton}"
+                        Style="{StaticResource TvChipButton}"
                         BackgroundColor="{Binding DocsActive,      Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding DocsActive,            Converter={x:StaticResource BoolToChipFgConverter}}" />
 
                 <Button Text="Education"
                         Command="{Binding SetFilterCommand}" CommandParameter="Education"
-                        Style="{StaticResource ChipButton}"
+                        Style="{StaticResource TvChipButton}"
                         BackgroundColor="{Binding EducationActive, Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding EducationActive,       Converter={x:StaticResource BoolToChipFgConverter}}" />
 
                 <Button Text="Music"
                         Command="{Binding SetFilterCommand}" CommandParameter="MusicVideo"
-                        Style="{StaticResource ChipButton}"
+                        Style="{StaticResource TvChipButton}"
                         BackgroundColor="{Binding MusicActive,     Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding MusicActive,           Converter={x:StaticResource BoolToChipFgConverter}}" />
 
                 <Button Text="♥ Favorites"
                         Command="{Binding ToggleFavoritesCommand}"
-                        Style="{StaticResource ChipButton}"
+                        Style="{StaticResource TvChipButton}"
                         BackgroundColor="{Binding FavoritesActive, Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding FavoritesActive,       Converter={x:StaticResource BoolToChipFgConverter}}" />
 
@@ -130,7 +130,7 @@
                     Text="⟳ TMDB"
                     Command="{Binding RefreshAllTmdbCommand}"
                     IsEnabled="{Binding IsTmdbRefreshing, Converter={x:StaticResource InvertedBoolConverter}}"
-                    Style="{StaticResource ChipButton}"
+                    Style="{StaticResource TvChipButton}"
                     BackgroundColor="{StaticResource Surface2Color}"
                     TextColor="{StaticResource AccentColor}"
                     ToolTipProperties.Text="Fetch missing posters, descriptions and ratings from TMDB" />
@@ -147,15 +147,15 @@
             <CollectionView
                 x:Name="MediaGrid"
                 ItemsSource="{Binding Items}"
-                SelectionMode="None"
+                SelectionMode="Single"
                 EmptyView="No media found. Try scanning or adjusting filters.">
 
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout
                         Orientation="Vertical"
-                        Span="2"
-                        HorizontalItemSpacing="8"
-                        VerticalItemSpacing="8" />
+                        Span="4"
+                        HorizontalItemSpacing="12"
+                        VerticalItemSpacing="12" />
                 </CollectionView.ItemsLayout>
 
                 <CollectionView.Header>
@@ -320,7 +320,7 @@
                                 <TapGestureRecognizer Tapped="OnCardTapped" />
                             </Grid.GestureRecognizers>
 
-                            <Border Style="{StaticResource CardFrame}">
+                            <Border Style="{StaticResource TvCardFrame}">
                                 <Grid RowDefinitions="200, Auto">
 
                                     <!-- Poster image -->
@@ -391,7 +391,7 @@
                 Text="← Prev"
                 Command="{Binding PreviousPageCommand}"
                 IsEnabled="{Binding HasPreviousPage}"
-                Style="{StaticResource ChipButton}" />
+                Style="{StaticResource TvChipButton}" />
 
             <Label
                 Grid.Column="1"
@@ -406,7 +406,7 @@
                 Text="Next →"
                 Command="{Binding NextPageCommand}"
                 IsEnabled="{Binding HasNextPage}"
-                Style="{StaticResource ChipButton}" />
+                Style="{StaticResource TvChipButton}" />
         </Grid>
 
     </Grid>

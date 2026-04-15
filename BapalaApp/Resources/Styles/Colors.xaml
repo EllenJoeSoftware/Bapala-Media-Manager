@@ -12,5 +12,8 @@
     <Color x:Key="Text2Color">#aaaaaa</Color>
     <Color x:Key="DangerColor">#5a0000</Color>
     <Color x:Key="TransparentAccentColor">#33e50914</Color>
+    <!-- TV focus highlight colour — bright accent border so D-pad selection is obvious -->
+    <Color x:Key="FocusColor">#e50914</Color>
+    <Color x:Key="FocusBgColor">#2ae50914</Color>
 
 </ResourceDictionary>
