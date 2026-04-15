@@ -24,9 +24,16 @@
         <!-- LEANBACK_LAUNCHER makes the app appear in the Android TV home screen launcher -->
         <activity android:name="com.bapala.app.MainActivity"
                   android:exported="true">
+            <!-- Phone/tablet launcher — shows one icon in the regular app drawer -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- TV launcher — shows the app on the Android TV home screen.
+                 Kept in a separate intent-filter so phone launchers don't
+                 pick it up as a second icon. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
