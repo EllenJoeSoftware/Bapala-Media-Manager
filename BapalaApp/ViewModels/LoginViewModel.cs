@@ -63,7 +63,7 @@ public partial class LoginViewModel : BaseViewModel
         await _discovery.StartAsync();
 
         // After 8 seconds, stop scanning and update the status label
-        await Task.Delay(8_000);
+        await Task.Delay(15_000);
         _discovery.Stop();
         IsScanning = false;
 

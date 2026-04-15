@@ -9,25 +9,35 @@ namespace BapalaApp.Platforms.Android;
 
 /// <summary>
 /// Android implementation of server discovery using <see cref="NsdManager"/>
-/// (Network Service Discovery — Android's wrapper around mDNS / DNS-SD).
+/// (Network Service Discovery — Android's mDNS/DNS-SD wrapper).
 ///
-/// The server broadcasts <c>_bapala._tcp</c> via Makaretu mDNS; this class
-/// listens for those announcements, resolves the host + port, and raises
-/// <see cref="IServerDiscoveryService.ServerFound"/> on the UI thread.
+/// Known Android quirks handled here:
 ///
-/// Android quirk — only ONE active resolution at a time:
-///   NsdManager.ResolveService throws FAILURE_ALREADY_ACTIVE if called
-///   concurrently.  We serialize resolutions through a simple queue.
+///  1. ServiceType suffix — NsdManager requires the service type to end with
+///     a trailing dot AND to have the full DNS-SD format "_type._tcp." but when
+///     comparing in OnServiceFound the OS sometimes strips the dot.  We match
+///     on Contains rather than Equals to be safe.
 ///
-/// Multicast lock:
-///   Android's Wi-Fi chip can filter out multicast packets when the screen
-///   is on and no multicast lock is held.  We acquire a lock for the lifetime
-///   of the scan to ensure mDNS packets get through reliably.
+///  2. One-at-a-time resolution — NsdManager.ResolveService throws
+///     FAILURE_ALREADY_ACTIVE if called concurrently.  Resolutions are
+///     serialised through a semaphore.
+///
+///  3. Multicast lock — Android's Wi-Fi chip can silently drop multicast
+///     packets.  A MulticastLock must be held for the entire scan duration.
+///
+///  4. API 34 deprecations — ResolveService and NsdServiceInfo.Host are
+///     obsoleted on API 34+ but no back-ported replacement exists.  They are
+///     suppressed with #pragma and still work on API 26-33.
+///
+///  5. ResolveService on API 34+ sometimes returns FAILURE_ALREADY_ACTIVE
+///     even through the semaphore because the OS-level queue is separate.
+///     We retry once after a short delay before giving up.
 /// </summary>
 internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
     NsdManager.IDiscoveryListener,
     IServerDiscoveryService
 {
+    // The trailing dot is required by NsdManager for the browse call.
     private const string ServiceType = "_bapala._tcp.";
 
     private readonly NsdManager _nsd;
@@ -66,14 +76,8 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
     public void Stop()
     {
         if (!_discovering) return;
-        try
-        {
-            _nsd.StopServiceDiscovery(this);
-        }
-        catch
-        {
-            // StopServiceDiscovery can throw if the listener was never fully started
-        }
+        try { _nsd.StopServiceDiscovery(this); }
+        catch { /* can throw if listener was never fully started */ }
         finally
         {
             _mcLock.Release();
@@ -83,26 +87,31 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
 
     // ── NsdManager.IDiscoveryListener ─────────────────────────────────────────
 
-    public void OnDiscoveryStarted(string? serviceType)
-    { /* nothing — just confirms scanning began */ }
+    public void OnDiscoveryStarted(string? serviceType) { }
 
     public void OnDiscoveryStopped(string? serviceType)
-    { _discovering = false; }
+        => _discovering = false;
 
     public void OnStartDiscoveryFailed(string? serviceType, NsdFailure errorCode)
     {
         _discovering = false;
-        _mcLock.Release();
+        // Release only if we actually acquired
+        try { _mcLock.Release(); } catch { }
     }
 
-    public void OnStopDiscoveryFailed(string? serviceType, NsdFailure errorCode)
-    { /* best-effort */ }
+    public void OnStopDiscoveryFailed(string? serviceType, NsdFailure errorCode) { }
 
     public void OnServiceFound(NsdServiceInfo? serviceInfo)
     {
         if (serviceInfo == null) return;
-        // Kick off resolution on a thread-pool thread to keep the callback
-        // (which runs on the NSD thread) non-blocking.
+
+        // The OS sometimes delivers services from OTHER types on the same
+        // mDNS bus — filter to our service type only.
+        // Use Contains because the OS may or may not include the trailing dot.
+        var type = serviceInfo.ServiceType ?? string.Empty;
+        if (!type.Contains("_bapala._tcp", StringComparison.OrdinalIgnoreCase))
+            return;
+
         Task.Run(() => ResolveAsync(serviceInfo));
     }
 
@@ -119,46 +128,90 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
 
     // ── Resolution ────────────────────────────────────────────────────────────
 
-    private async Task ResolveAsync(NsdServiceInfo serviceInfo)
+    private async Task ResolveAsync(NsdServiceInfo serviceInfo, int attempt = 0)
     {
-        // Serialize — only one resolution active at a time
         await _resolveSemaphore.WaitAsync();
         try
         {
             var tcs = new TaskCompletionSource<NsdServiceInfo?>();
             var listener = new ResolveListener(tcs);
 
-#pragma warning disable CA1422 // NsdManager.ResolveService obsoleted on API 34+; replacement only available 34+
+#pragma warning disable CA1422
             _nsd.ResolveService(serviceInfo, listener);
 #pragma warning restore CA1422
 
-            // Give the OS up to 5 s to resolve the service
-            var resolved = await Task.WhenAny(tcs.Task, Task.Delay(5_000)) == tcs.Task
+            // Give the OS up to 6 s to respond
+            var resolved = await Task.WhenAny(tcs.Task, Task.Delay(6_000)) == tcs.Task
                 ? await tcs.Task
                 : null;
 
-#pragma warning disable CA1422 // NsdServiceInfo.Host obsoleted on API 34+; replacement only available 34+
-            if (resolved?.Host == null) return;
-            var host   = resolved.Host.HostAddress ?? resolved.Host.ToString();
+            if (resolved == null)
+            {
+                // Timed out — retry once after a short back-off
+                if (attempt == 0)
+                {
+                    _resolveSemaphore.Release();
+                    await Task.Delay(1_500);
+                    await ResolveAsync(serviceInfo, attempt: 1);
+                }
+                return;
+            }
+
+#pragma warning disable CA1422
+            var hostObj = resolved.Host;
 #pragma warning restore CA1422
+
+            if (hostObj == null) return;
+
+            // Prefer the first non-loopback, non-link-local IPv4 address
+            string? host = null;
+            try
+            {
+                var allAddresses = Java.Net.InetAddress.GetAllByName(hostObj.HostName);
+                host = allAddresses
+                    .OfType<Java.Net.Inet4Address>()
+                    .Select(a => a.HostAddress)
+                    .FirstOrDefault(a => a != null && !a.StartsWith("127.") && !a.StartsWith("169.254."));
+            }
+            catch { }
+
+            // Fall back to whatever the OS gave us
+            host ??= hostObj.HostAddress ?? hostObj.HostName ?? hostObj.ToString();
+
+            if (string.IsNullOrEmpty(host)) return;
+
             var port   = resolved.Port;
             var name   = resolved.ServiceName ?? "Bapala Server";
-            var server = new DiscoveredServer(name, host!, port);
+            var server = new DiscoveredServer(name, host, port);
 
             lock (_found)
             {
+                // Deduplicate — same name = same server (IP might have changed)
                 _found[name] = server;
             }
 
             RaiseOnMainThread(ServerFound, server);
         }
+        catch (Exception ex) when (ex.Message?.Contains("FAILURE_ALREADY_ACTIVE") == true)
+        {
+            // OS-level resolve queue is busy — back off and retry once
+            _resolveSemaphore.Release();
+            if (attempt == 0)
+            {
+                await Task.Delay(2_000);
+                await ResolveAsync(serviceInfo, attempt: 1);
+            }
+            return;
+        }
         catch
         {
-            // Best-effort — if resolution fails the user still has manual entry
+            // Best-effort — manual entry is always available
         }
         finally
         {
-            _resolveSemaphore.Release();
+            // Only release if we still hold it (the retry paths release early)
+            if (_resolveSemaphore.CurrentCount == 0)
+                _resolveSemaphore.Release();
         }
     }
 
