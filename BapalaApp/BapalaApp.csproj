@@ -1,13 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net9.0-android;net9.0-ios</TargetFrameworks>
-    <!-- RuntimeIdentifiers must be platform-scoped — the Android toolchain
-         errors (XA0035) if it sees 'ios-arm64' during an Android build.
-         Produce one APK per ABI:  dotnet publish -f net9.0-android -c Release -->
+    <!-- RuntimeIdentifiers scoped per platform — Android toolchain errors on 'ios-arm64'.
+         To get one APK per ABI run:  dotnet publish -f net9.0-android -r android-arm64 -c Release
+                                      dotnet publish -f net9.0-android -r android-arm   -c Release
+                                      dotnet publish -f net9.0-android -r android-x64   -c Release -->
     <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm;android-arm64;android-x64</RuntimeIdentifiers>
     <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">ios-arm64</RuntimeIdentifiers>
-    <AndroidCreatePackagePerAbi Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">true</AndroidCreatePackagePerAbi>
-    <AndroidSupportedAbis Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">armeabi-v7a;arm64-v8a;x86_64</AndroidSupportedAbis>
     <OutputType>Exe</OutputType>
     <RootNamespace>BapalaApp</RootNamespace>
     <UseMaui>true</UseMaui>

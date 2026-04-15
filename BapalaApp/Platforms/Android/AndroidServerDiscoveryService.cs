@@ -1,6 +1,7 @@
 using Android.Content;
 using Android.Net.Nsd;
 using Android.Net.Wifi;
+using Android.Util;
 using BapalaApp.Models;
 using BapalaApp.Services;
 using Application = Android.App.Application;
@@ -34,7 +35,7 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
         _mcLock = wifi.CreateMulticastLock("bapala_discovery")!;
         _mcLock.SetReferenceCounted(false);
 
-        Android.Util.Log.Debug(Tag, "AndroidServerDiscoveryService created");
+        Log.Debug(Tag, "AndroidServerDiscoveryService created");
     }
 
     // ── IServerDiscoveryService ───────────────────────────────────────────────
@@ -43,12 +44,12 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
     {
         if (_discovering)
         {
-            Android.Util.Log.Debug(Tag, "StartAsync called but already discovering — skipped");
+            Log.Debug(Tag, "StartAsync called but already discovering — skipped");
             return Task.CompletedTask;
         }
         _found.Clear();
         _mcLock.Acquire();
-        Android.Util.Log.Debug(Tag, $"Multicast lock acquired. Starting NSD browse for '{ServiceType}'");
+        Log.Debug(Tag, $"Multicast lock acquired. Starting NSD browse for '{ServiceType}'");
         _nsd.DiscoverServices(ServiceType, NsdProtocol.DnsSd, this);
         _discovering = true;
         return Task.CompletedTask;
@@ -58,66 +59,66 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
     {
         if (!_discovering)
         {
-            Android.Util.Log.Debug(Tag, "Stop called but not discovering — skipped");
+            Log.Debug(Tag, "Stop called but not discovering — skipped");
             return;
         }
-        Android.Util.Log.Debug(Tag, "Stopping NSD discovery");
+        Log.Debug(Tag, "Stopping NSD discovery");
         try { _nsd.StopServiceDiscovery(this); }
-        catch (Exception ex) { Android.Util.Log.Warn(Tag, $"StopServiceDiscovery threw: {ex.Message}"); }
+        catch (Exception ex) { Log.Warn(Tag, $"StopServiceDiscovery threw: {ex.Message}"); }
         finally
         {
             _mcLock.Release();
             _discovering = false;
-            Android.Util.Log.Debug(Tag, "Multicast lock released");
+            Log.Debug(Tag, "Multicast lock released");
         }
     }
 
     // ── NsdManager.IDiscoveryListener ─────────────────────────────────────────
 
     public void OnDiscoveryStarted(string? serviceType)
-        => Android.Util.Log.Debug(Tag, $"✅ Discovery started for type: '{serviceType}'");
+        => Log.Debug(Tag, $"✅ Discovery started for type: '{serviceType}'");
 
     public void OnDiscoveryStopped(string? serviceType)
     {
-        Android.Util.Log.Debug(Tag, $"Discovery stopped for type: '{serviceType}'");
+        Log.Debug(Tag, $"Discovery stopped for type: '{serviceType}'");
         _discovering = false;
     }
 
     public void OnStartDiscoveryFailed(string? serviceType, NsdFailure errorCode)
     {
-        Android.Util.Log.Error(Tag, $"❌ OnStartDiscoveryFailed — type: '{serviceType}', error: {errorCode}");
+        Log.Error(Tag, $"❌ OnStartDiscoveryFailed — type: '{serviceType}', error: {errorCode}");
         _discovering = false;
         try { _mcLock.Release(); } catch { }
     }
 
     public void OnStopDiscoveryFailed(string? serviceType, NsdFailure errorCode)
-        => Android.Util.Log.Warn(Tag, $"OnStopDiscoveryFailed — type: '{serviceType}', error: {errorCode}");
+        => Log.Warn(Tag, $"OnStopDiscoveryFailed — type: '{serviceType}', error: {errorCode}");
 
     public void OnServiceFound(NsdServiceInfo? serviceInfo)
     {
         if (serviceInfo == null)
         {
-            Android.Util.Log.Warn(Tag, "OnServiceFound called with null serviceInfo");
+            Log.Warn(Tag, "OnServiceFound called with null serviceInfo");
             return;
         }
 
-        Android.Util.Log.Debug(Tag, $"OnServiceFound — name: '{serviceInfo.ServiceName}', type: '{serviceInfo.ServiceType}'");
+        Log.Debug(Tag, $"OnServiceFound — name: '{serviceInfo.ServiceName}', type: '{serviceInfo.ServiceType}'");
 
         var type = serviceInfo.ServiceType ?? string.Empty;
         if (!type.Contains("_bapala._tcp", StringComparison.OrdinalIgnoreCase))
         {
-            Android.Util.Log.Debug(Tag, $"  → Ignored (not _bapala._tcp)");
+            Log.Debug(Tag, $"  → Ignored (not _bapala._tcp)");
             return;
         }
 
-        Android.Util.Log.Debug(Tag, $"  → Matched! Queuing resolve...");
+        Log.Debug(Tag, $"  → Matched! Queuing resolve...");
         Task.Run(() => ResolveAsync(serviceInfo));
     }
 
     public void OnServiceLost(NsdServiceInfo? serviceInfo)
     {
         if (serviceInfo?.ServiceName == null) return;
-        Android.Util.Log.Debug(Tag, $"OnServiceLost — name: '{serviceInfo.ServiceName}'");
+        Log.Debug(Tag, $"OnServiceLost — name: '{serviceInfo.ServiceName}'");
         lock (_found)
         {
             if (!_found.TryGetValue(serviceInfo.ServiceName, out var server)) return;
@@ -130,7 +131,7 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
 
     private async Task ResolveAsync(NsdServiceInfo serviceInfo, int attempt = 0)
     {
-        Android.Util.Log.Debug(Tag, $"ResolveAsync attempt {attempt} for '{serviceInfo.ServiceName}'");
+        Log.Debug(Tag, $"ResolveAsync attempt {attempt} for '{serviceInfo.ServiceName}'");
         await _resolveSemaphore.WaitAsync();
         try
         {
@@ -144,7 +145,7 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
             var completed = await Task.WhenAny(tcs.Task, Task.Delay(6_000));
             if (completed != tcs.Task)
             {
-                Android.Util.Log.Warn(Tag, $"  → Resolve timed out for '{serviceInfo.ServiceName}' (attempt {attempt})");
+                Log.Warn(Tag, $"  → Resolve timed out for '{serviceInfo.ServiceName}' (attempt {attempt})");
                 if (attempt == 0)
                 {
                     _resolveSemaphore.Release();
@@ -157,7 +158,7 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
             var resolved = await tcs.Task;
             if (resolved == null)
             {
-                Android.Util.Log.Warn(Tag, $"  → Resolve returned null for '{serviceInfo.ServiceName}'");
+                Log.Warn(Tag, $"  → Resolve returned null for '{serviceInfo.ServiceName}'");
                 return;
             }
 
@@ -165,19 +166,20 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
             var hostObj = resolved.Host;
 #pragma warning restore CA1422
 
-            Android.Util.Log.Debug(Tag, $"  → Resolved: host={hostObj?.HostName}, hostAddress={hostObj?.HostAddress}, port={resolved.Port}");
+            Log.Debug(Tag, $"  → Resolved: host={hostObj?.HostName}, hostAddress={hostObj?.HostAddress}, port={resolved.Port}");
 
             if (hostObj == null)
             {
-                Android.Util.Log.Warn(Tag, "  → Host is null after resolve");
+                Log.Warn(Tag, "  → Host is null after resolve");
                 return;
             }
 
             string? host = null;
             try
             {
-                var allAddresses = Java.Net.InetAddress.GetAllByName(hostObj.HostName);
-                Android.Util.Log.Debug(Tag, $"  → All addresses for '{hostObj.HostName}': {string.Join(", ", allAddresses.Select(a => a.HostAddress))}");
+                var allAddresses = Java.Net.InetAddress.GetAllByName(hostObj.HostName)
+                    ?? Array.Empty<Java.Net.InetAddress>();
+                Log.Debug(Tag, $"  → All addresses for '{hostObj.HostName}': {string.Join(", ", allAddresses.Select(a => a.HostAddress))}");
                 host = allAddresses
                     .OfType<Java.Net.Inet4Address>()
                     .Select(a => a.HostAddress)
@@ -185,15 +187,15 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
             }
             catch (Exception ex)
             {
-                Android.Util.Log.Warn(Tag, $"  → GetAllByName failed: {ex.Message}");
+                Log.Warn(Tag, $"  → GetAllByName failed: {ex.Message}");
             }
 
             host ??= hostObj.HostAddress ?? hostObj.HostName ?? hostObj.ToString();
-            Android.Util.Log.Debug(Tag, $"  → Using host: '{host}'");
+            Log.Debug(Tag, $"  → Using host: '{host}'");
 
             if (string.IsNullOrEmpty(host))
             {
-                Android.Util.Log.Warn(Tag, "  → Final host is empty — aborting");
+                Log.Warn(Tag, "  → Final host is empty — aborting");
                 return;
             }
 
@@ -201,14 +203,14 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
             var name   = resolved.ServiceName ?? "Bapala Server";
             var server = new DiscoveredServer(name, host, port);
 
-            Android.Util.Log.Debug(Tag, $"  ✅ Server discovered: {server.DisplayLabel}");
+            Log.Debug(Tag, $"  ✅ Server discovered: {server.DisplayLabel}");
 
             lock (_found) { _found[name] = server; }
             RaiseOnMainThread(ServerFound, server);
         }
         catch (Exception ex) when (ex.Message?.Contains("FAILURE_ALREADY_ACTIVE") == true)
         {
-            Android.Util.Log.Warn(Tag, $"  → FAILURE_ALREADY_ACTIVE on attempt {attempt} — backing off");
+            Log.Warn(Tag, $"  → FAILURE_ALREADY_ACTIVE on attempt {attempt} — backing off");
             _resolveSemaphore.Release();
             if (attempt == 0)
             {
@@ -219,7 +221,7 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
         }
         catch (Exception ex)
         {
-            Android.Util.Log.Error(Tag, $"  → Unexpected error in ResolveAsync: {ex.GetType().Name}: {ex.Message}");
+            Log.Error(Tag, $"  → Unexpected error in ResolveAsync: {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -241,13 +243,13 @@ internal sealed class AndroidServerDiscoveryService : Java.Lang.Object,
     {
         public void OnServiceResolved(NsdServiceInfo? serviceInfo)
         {
-            Android.Util.Log.Debug("BapalaDisc", $"  → OnServiceResolved: '{serviceInfo?.ServiceName}'");
+            Log.Debug("BapalaDisc", $"  → OnServiceResolved: '{serviceInfo?.ServiceName}'");
             tcs.TrySetResult(serviceInfo);
         }
 
         public void OnResolveFailed(NsdServiceInfo? serviceInfo, NsdFailure errorCode)
         {
-            Android.Util.Log.Warn("BapalaDisc", $"  → OnResolveFailed: '{serviceInfo?.ServiceName}', error: {errorCode}");
+            Log.Warn("BapalaDisc", $"  → OnResolveFailed: '{serviceInfo?.ServiceName}', error: {errorCode}");
             tcs.TrySetResult(null);
         }
     }
