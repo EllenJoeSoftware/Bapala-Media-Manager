@@ -15,4 +15,15 @@ public interface IMediaRepository
     Task DeleteAsync(int id);
     Task<WatchHistory?> GetWatchHistoryAsync(int mediaItemId);
     Task UpsertWatchHistoryAsync(int mediaItemId, long progressSeconds);
+
+    /// <summary>
+    /// Returns media items the user has started but not finished, newest first.
+    /// "In progress" means: progress > 30 s AND progress < 95 % of duration.
+    /// </summary>
+    Task<IEnumerable<(MediaItem Item, WatchHistory History)>> GetContinueWatchingAsync(int limit = 20);
+
+    /// <summary>
+    /// Returns aggregate counts for the library stats endpoint.
+    /// </summary>
+    Task<LibraryStats> GetLibraryStatsAsync();
 }

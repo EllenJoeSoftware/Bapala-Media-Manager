@@ -2,6 +2,26 @@ using System.Globalization;
 
 namespace BapalaApp.Converters;
 
+/// <summary>Returns true when an int is greater than zero. Used to show/hide the discovered server list.</summary>
+public class IntToBoolConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is int n && n > 0;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>Inverts a boolean value — used to hide the rescan button while scanning is active.</summary>
+public class InvertedBoolConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is bool b && !b;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>Returns true when the bound string is non-null and non-empty.</summary>
 public class StringNotEmptyConverter : IValueConverter
 {

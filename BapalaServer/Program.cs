@@ -9,7 +9,22 @@ using BapalaServer.Data;
 using BapalaServer.Repositories;
 using BapalaServer.Services;
 
+// ── Windows Service support ───────────────────────────────────────────────────
+// When installed via `sc.exe create`, UseWindowsService() makes ASP.NET Core
+// respond to Start/Stop/Pause signals from the Service Control Manager.
+// When run interactively (double-click or terminal), it behaves normally.
+
+// Pin the working directory to the folder containing the exe.
+// Windows Services start in System32 by default; without this the SQLite database
+// and appsettings.json would be created in the wrong place.
+var exeDir = AppContext.BaseDirectory;
+Directory.SetCurrentDirectory(exeDir);
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseWindowsService(opts =>
+{
+    opts.ServiceName = "BapalaMediaServer";
+});
 
 // Database
 var dbRelative = builder.Configuration.GetConnectionString("Default") ?? "Data Source=bapala.db";
@@ -130,6 +145,9 @@ using (var scope = app.Services.CreateScope())
 
 app.UseCors();
 
+// ── Global exception handling (must be first in pipeline) ─────────────────
+app.UseMiddleware<BapalaServer.Middleware.GlobalExceptionMiddleware>();
+
 // Default to login.html when visiting /
 var defaultFiles = new DefaultFilesOptions();
 defaultFiles.DefaultFileNames.Clear();
@@ -145,10 +163,40 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
+// ── Structured request logging (skip static files & health pings) ─────────
+app.Use(async (ctx, next) =>
+{
+    var path = ctx.Request.Path.Value ?? "";
+    var isStaticOrHealth = path.StartsWith("/lib/") || path.StartsWith("/css/") ||
+                           path.StartsWith("/js/")  || path == "/favicon.ico" ||
+                           path == "/health";
+    if (!isStaticOrHealth)
+    {
+        var logger = ctx.RequestServices.GetRequiredService<ILogger<Program>>();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await next();
+        sw.Stop();
+        logger.LogInformation("{Method} {Path} → {Status} in {Ms}ms",
+            ctx.Request.Method, path, ctx.Response.StatusCode, sw.ElapsedMilliseconds);
+    }
+    else
+    {
+        await next();
+    }
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<BapalaServer.Hubs.ScanProgressHub>("/hubs/scan");
+
+// ── Health check endpoint ──────────────────────────────────────────────────
+app.MapGet("/health", () => Results.Ok(new
+{
+    status  = "healthy",
+    version = "1.0.0",
+    utc     = DateTime.UtcNow
+})).AllowAnonymous();
 
 // OpenAPI JSON  →  /openapi/v1.json
 app.MapOpenApi();

@@ -19,7 +19,7 @@
             Margin="8,0" />
     </Shell.TitleView>
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto">
+    <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
 
         <!-- ── Row 0: Search bar ─────────────────────────────────────────── -->
         <SearchBar
@@ -30,7 +30,42 @@
             BackgroundColor="{StaticResource SurfaceColor}"
             Margin="0" />
 
-        <!-- ── Row 1: Filter chips ───────────────────────────────────────── -->
+        <!-- ── Row 1: TMDB refresh progress bar (visible while running) ──── -->
+        <Grid
+            Grid.Row="1"
+            RowDefinitions="Auto, Auto"
+            IsVisible="{Binding IsTmdbRefreshing}"
+            BackgroundColor="{StaticResource SurfaceColor}"
+            Padding="12,6">
+
+            <Grid Grid.Row="0" ColumnDefinitions="*, Auto">
+                <Label
+                    Grid.Column="0"
+                    Text="{Binding TmdbStatusText}"
+                    FontSize="12"
+                    TextColor="{StaticResource Text2Color}"
+                    VerticalOptions="Center"
+                    LineBreakMode="TailTruncation" />
+                <Label
+                    Grid.Column="1"
+                    Text="{Binding TmdbProgressLabel}"
+                    FontSize="12"
+                    FontAttributes="Bold"
+                    TextColor="{StaticResource AccentColor}"
+                    VerticalOptions="Center"
+                    Margin="8,0,0,0" />
+            </Grid>
+
+            <ProgressBar
+                Grid.Row="1"
+                Progress="{Binding TmdbProgressFraction}"
+                ProgressColor="{StaticResource AccentColor}"
+                BackgroundColor="{StaticResource Surface2Color}"
+                Margin="0,4,0,0" />
+
+        </Grid>
+
+        <!-- ── Row 2: Filter chips ───────────────────────────────────────── -->
         <!--
             We bind BackgroundColor + TextColor directly on each Button rather than
             binding the Style property via a converter.  Binding an entire Style object
@@ -38,7 +73,7 @@
             fully supported and type-safe.
         -->
         <ScrollView
-            Grid.Row="1"
+            Grid.Row="2"
             Orientation="Horizontal"
             HorizontalScrollBarVisibility="Never"
             BackgroundColor="{StaticResource SurfaceColor}"
@@ -87,12 +122,25 @@
                         BackgroundColor="{Binding FavoritesActive, Converter={x:StaticResource BoolToChipBgConverter}}"
                         TextColor="{Binding FavoritesActive,       Converter={x:StaticResource BoolToChipFgConverter}}" />
 
+                <!-- Divider -->
+                <BoxView WidthRequest="1" HeightRequest="20" Color="{StaticResource Surface2Color}" VerticalOptions="Center" Margin="4,0" />
+
+                <!-- TMDB refresh button -->
+                <Button
+                    Text="⟳ TMDB"
+                    Command="{Binding RefreshAllTmdbCommand}"
+                    IsEnabled="{Binding IsTmdbRefreshing, Converter={x:StaticResource InvertedBoolConverter}}"
+                    Style="{StaticResource ChipButton}"
+                    BackgroundColor="{StaticResource Surface2Color}"
+                    TextColor="{StaticResource AccentColor}"
+                    ToolTipProperties.Text="Fetch missing posters, descriptions and ratings from TMDB" />
+
             </HorizontalStackLayout>
         </ScrollView>
 
-        <!-- ── Row 2: Media grid ─────────────────────────────────────────── -->
+        <!-- ── Row 3: Media grid ─────────────────────────────────────────── -->
         <RefreshView
-            Grid.Row="2"
+            Grid.Row="3"
             Command="{Binding RefreshCommand}"
             IsRefreshing="{Binding IsRefreshing}">
 
@@ -111,11 +159,150 @@
                 </CollectionView.ItemsLayout>
 
                 <CollectionView.Header>
-                    <ActivityIndicator
-                        IsRunning="{Binding IsBusy}"
-                        IsVisible="{Binding IsBusy}"
-                        Margin="0,16"
-                        HorizontalOptions="Center" />
+                    <VerticalStackLayout Spacing="0">
+
+                        <!-- Loading indicator -->
+                        <ActivityIndicator
+                            IsRunning="{Binding IsBusy}"
+                            IsVisible="{Binding IsBusy}"
+                            Margin="0,16"
+                            HorizontalOptions="Center" />
+
+                        <!-- ── Stats row ───────────────────────────────────── -->
+                        <Grid
+                            IsVisible="{Binding HasStats}"
+                            ColumnDefinitions="*,*,*,*"
+                            Padding="12,12,12,4"
+                            ColumnSpacing="8">
+
+                            <Border Grid.Column="0" Style="{StaticResource StatTile}">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding Stats.TotalItems}" Style="{StaticResource StatNumber}" />
+                                    <Label Text="Items" Style="{StaticResource StatLabel}" />
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <Border Grid.Column="1" Style="{StaticResource StatTile}">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding Stats.Movies}" Style="{StaticResource StatNumber}" />
+                                    <Label Text="Movies" Style="{StaticResource StatLabel}" />
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <Border Grid.Column="2" Style="{StaticResource StatTile}">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding Stats.Series}" Style="{StaticResource StatNumber}" />
+                                    <Label Text="Series" Style="{StaticResource StatLabel}" />
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <Border Grid.Column="3" Style="{StaticResource StatTile}">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding Stats.TotalDurationDisplay}" Style="{StaticResource StatNumber}" />
+                                    <Label Text="Total" Style="{StaticResource StatLabel}" />
+                                </VerticalStackLayout>
+                            </Border>
+
+                        </Grid>
+
+                        <!-- ── Continue Watching ──────────────────────────── -->
+                        <VerticalStackLayout
+                            IsVisible="{Binding HasContinueWatching}"
+                            Padding="0,8,0,4"
+                            Spacing="0">
+
+                            <Label
+                                Text="▶  Continue Watching"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource TextColor}"
+                                Margin="12,0,12,8" />
+
+                            <ScrollView
+                                Orientation="Horizontal"
+                                HorizontalScrollBarVisibility="Never">
+
+                                <HorizontalStackLayout
+                                    Spacing="10"
+                                    Padding="12,0">
+
+                                    <BindableLayout.ItemsSource>
+                                        <Binding Path="ContinueWatching" />
+                                    </BindableLayout.ItemsSource>
+
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:ContinueWatchingItem">
+                                            <Border
+                                                WidthRequest="140"
+                                                StrokeShape="RoundRectangle 10"
+                                                Stroke="{StaticResource Surface2Color}"
+                                                BackgroundColor="{StaticResource SurfaceColor}">
+
+                                                <Grid>
+                                                    <Grid.GestureRecognizers>
+                                                        <TapGestureRecognizer Tapped="OnContinueWatchingTapped" />
+                                                    </Grid.GestureRecognizers>
+
+                                                    <Grid RowDefinitions="110, Auto, 4">
+
+                                                        <!-- Poster -->
+                                                        <Image
+                                                            Grid.Row="0"
+                                                            Aspect="AspectFill"
+                                                            BackgroundColor="{StaticResource Surface2Color}">
+                                                            <Image.Source>
+                                                                <UriImageSource
+                                                                    Uri="{Binding PosterPath}"
+                                                                    CacheValidity="7.00:00:00" />
+                                                            </Image.Source>
+                                                        </Image>
+
+                                                        <!-- Title + remaining -->
+                                                        <VerticalStackLayout
+                                                            Grid.Row="1"
+                                                            Padding="8,6"
+                                                            Spacing="2">
+                                                            <Label
+                                                                Text="{Binding Title}"
+                                                                FontSize="12"
+                                                                FontAttributes="Bold"
+                                                                TextColor="{StaticResource TextColor}"
+                                                                LineBreakMode="TailTruncation"
+                                                                MaxLines="2" />
+                                                            <Label
+                                                                Text="{Binding RemainingLabel}"
+                                                                FontSize="10"
+                                                                TextColor="{StaticResource AccentColor}" />
+                                                        </VerticalStackLayout>
+
+                                                        <!-- Progress bar -->
+                                                        <ProgressBar
+                                                            Grid.Row="2"
+                                                            Progress="{Binding ProgressFraction}"
+                                                            ProgressColor="{StaticResource AccentColor}"
+                                                            BackgroundColor="{StaticResource Surface2Color}" />
+
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+
+                                </HorizontalStackLayout>
+                            </ScrollView>
+
+                        </VerticalStackLayout>
+
+                        <!-- Section label for the main grid -->
+                        <Label
+                            Text="All Media"
+                            FontSize="14"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource TextColor}"
+                            Margin="12,12,12,4"
+                            IsVisible="{Binding HasContinueWatching}" />
+
+                    </VerticalStackLayout>
                 </CollectionView.Header>
 
                 <!--
@@ -191,9 +378,9 @@
             </CollectionView>
         </RefreshView>
 
-        <!-- ── Row 3: Pagination ─────────────────────────────────────────── -->
+        <!-- ── Row 4: Pagination ─────────────────────────────────────────── -->
         <Grid
-            Grid.Row="3"
+            Grid.Row="4"
             ColumnDefinitions="Auto,*,Auto"
             Padding="16,8"
             BackgroundColor="{StaticResource SurfaceColor}"

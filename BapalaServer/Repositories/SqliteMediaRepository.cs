@@ -102,4 +102,60 @@ public class SqliteMediaRepository(BapalaDbContext db) : IMediaRepository
         }
         await db.SaveChangesAsync();
     }
+
+    public async Task<IEnumerable<(MediaItem Item, WatchHistory History)>> GetContinueWatchingAsync(int limit = 20)
+    {
+        // Join WatchHistory → MediaItem; filter out trivially short progress
+        // and items that are essentially finished (>= 95 % of known duration).
+        var rows = await db.WatchHistory
+            .Where(w => w.ProgressSeconds > 30)
+            .Include(w => w.MediaItem)
+            .OrderByDescending(w => w.WatchedAt)
+            .Take(limit * 2)   // over-fetch so we can filter finished items client-side
+            .ToListAsync();
+
+        return rows
+            .Where(w =>
+                w.MediaItem.DurationSeconds == null ||
+                w.MediaItem.DurationSeconds == 0    ||
+                (double)w.ProgressSeconds / w.MediaItem.DurationSeconds < 0.95)
+            .Take(limit)
+            .Select(w => (w.MediaItem, w));
+    }
+
+    public async Task<LibraryStats> GetLibraryStatsAsync()
+    {
+        var total     = await db.MediaItems.CountAsync();
+        var movies    = await db.MediaItems.CountAsync(m => m.Type == MediaType.Movie);
+        var series    = await db.MediaItems.CountAsync(m => m.Type == MediaType.Series);
+        var docs      = await db.MediaItems.CountAsync(m => m.Type == MediaType.Documentary);
+        var edu       = await db.MediaItems.CountAsync(m => m.Type == MediaType.Education);
+        var music     = await db.MediaItems.CountAsync(m => m.Type == MediaType.MusicVideo);
+        var favorites = await db.MediaItems.CountAsync(m => m.IsFavorite);
+        var totalDur  = await db.MediaItems
+            .Where(m => m.DurationSeconds.HasValue)
+            .SumAsync(m => m.DurationSeconds ?? 0);
+
+        // In-progress: has watch history, progress > 30 s, progress < 95 %
+        var inProgressCount = await db.WatchHistory
+            .Where(w => w.ProgressSeconds > 30)
+            .Include(w => w.MediaItem)
+            .CountAsync(w =>
+                w.MediaItem.DurationSeconds == null ||
+                w.MediaItem.DurationSeconds == 0    ||
+                (double)w.ProgressSeconds / w.MediaItem.DurationSeconds < 0.95);
+
+        return new LibraryStats
+        {
+            TotalItems           = total,
+            Movies               = movies,
+            Series               = series,
+            Documentaries        = docs,
+            Education            = edu,
+            MusicVideos          = music,
+            Favorites            = favorites,
+            InProgress           = inProgressCount,
+            TotalDurationSeconds = totalDur,
+        };
+    }
 }

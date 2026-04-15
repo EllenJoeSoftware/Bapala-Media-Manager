@@ -12,6 +12,9 @@
     <!-- Per-property chip colour converters — safer than binding the Style object -->
     <conv:BoolToChipBgConverter    x:Key="BoolToChipBgConverter" />
     <conv:BoolToChipFgConverter    x:Key="BoolToChipFgConverter" />
+    <!-- Discovery panel converters -->
+    <conv:IntToBoolConverter       x:Key="IntToBoolConverter" />
+    <conv:InvertedBoolConverter    x:Key="InvertedBoolConverter" />
 
     <!-- ── Page / shell ──────────────────────────────────────────────────── -->
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
@@ -79,6 +82,26 @@
     </Style>
     <Style TargetType="RefreshView">
         <Setter Property="RefreshColor" Value="{StaticResource AccentColor}" />
+    </Style>
+
+    <!-- ── Stats tiles ───────────────────────────────────────────────────── -->
+    <Style x:Key="StatTile" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="StrokeShape"     Value="RoundRectangle 8" />
+        <Setter Property="Padding"         Value="8,8" />
+        <Setter Property="HorizontalOptions" Value="Fill" />
+    </Style>
+    <Style x:Key="StatNumber" TargetType="Label">
+        <Setter Property="FontSize"       Value="18" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor"      Value="{StaticResource AccentColor}" />
+        <Setter Property="HorizontalOptions" Value="Center" />
+    </Style>
+    <Style x:Key="StatLabel" TargetType="Label">
+        <Setter Property="FontSize"       Value="10" />
+        <Setter Property="TextColor"      Value="{StaticResource Text2Color}" />
+        <Setter Property="HorizontalOptions" Value="Center" />
     </Style>
 
 </ResourceDictionary>

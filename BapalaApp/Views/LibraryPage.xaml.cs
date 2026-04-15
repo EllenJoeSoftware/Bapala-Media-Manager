@@ -39,4 +39,12 @@ public partial class LibraryPage : ContentPage
         if (sender is Button btn && btn.BindingContext is MediaItem item)
             _vm.ToggleItemFavoriteCommand.Execute(item);
     }
+
+    // ── Continue Watching tap ─────────────────────────────────────────────────
+
+    private void OnContinueWatchingTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is View v && v.BindingContext is ContinueWatchingItem item)
+            _vm.ResumeContinueWatchingCommand.Execute(item);
+    }
 }

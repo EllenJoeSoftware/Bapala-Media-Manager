@@ -32,6 +32,12 @@ public class BapalaApiService
     public string? ServerUrl { get; private set; }
     public bool IsAuthenticated { get; private set; }
 
+    /// <summary>
+    /// Exposes the in-memory JWT so callers like SignalR can authenticate
+    /// without touching SecureStorage from a background thread.
+    /// </summary>
+    public string? CachedToken => _cachedToken;
+
     public BapalaApiService()
     {
         _http = new HttpClient(new HttpClientHandler
@@ -201,6 +207,65 @@ public class BapalaApiService
                 JsonOpts);
         }
         catch { /* best-effort — never crash the player */ }
+    }
+
+    // ── TMDB metadata ────────────────────────────────────────────────────────
+
+    /// <summary>Refresh TMDB metadata for a single item.</summary>
+    public async Task<(bool Success, string Message)> RefreshTmdbAsync(int id)
+    {
+        var resp = await _http.PostAsync($"{ServerUrl}/api/media/{id}/refresh-tmdb",
+            new StringContent(""));
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>(JsonOpts);
+        var success = json.TryGetProperty("success", out var s) && s.GetBoolean();
+        var message = json.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
+        return (success, message);
+    }
+
+    /// <summary>
+    /// Kick off a background bulk TMDB refresh on the server.
+    /// Progress is delivered via SignalR (handled by LibraryViewModel).
+    /// </summary>
+    /// <param name="force">When true, re-fetches even items that already have full metadata.</param>
+    public async Task<bool> RefreshTmdbAllAsync(bool force = false)
+    {
+        try
+        {
+            var resp = await _http.PostAsync(
+                $"{ServerUrl}/api/media/refresh-tmdb-all?force={force}",
+                new StringContent(""));
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    // ── Continue watching ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns items the user has started but not finished, ordered by most-recently-watched.
+    /// Returns an empty list on any error so the UI degrades gracefully.
+    /// </summary>
+    public async Task<List<ContinueWatchingItem>> GetContinueWatchingAsync(int limit = 20)
+    {
+        try
+        {
+            var resp = await _http.GetAsync($"{ServerUrl}/api/media/continue-watching?limit={limit}");
+            if (!resp.IsSuccessStatusCode) return [];
+            return (await resp.Content.ReadFromJsonAsync<List<ContinueWatchingItem>>(JsonOpts)) ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>Returns aggregate library statistics.</summary>
+    public async Task<LibraryStats?> GetStatsAsync()
+    {
+        try
+        {
+            var resp = await _http.GetAsync($"{ServerUrl}/api/media/stats");
+            if (!resp.IsSuccessStatusCode) return null;
+            return await resp.Content.ReadFromJsonAsync<LibraryStats>(JsonOpts);
+        }
+        catch { return null; }
     }
 
     // ── Streaming URL ─────────────────────────────────────────────────────────

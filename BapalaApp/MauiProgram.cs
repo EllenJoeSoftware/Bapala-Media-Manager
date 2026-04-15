@@ -2,6 +2,11 @@ using CommunityToolkit.Maui;
 using BapalaApp.Services;
 using BapalaApp.ViewModels;
 using BapalaApp.Views;
+#if ANDROID
+using BapalaApp.Platforms.Android;
+#elif IOS
+using BapalaApp.Platforms.iOS;
+#endif
 
 namespace BapalaApp;
 
@@ -24,6 +29,13 @@ public static class MauiProgram
         // ── Services ──────────────────────────────────────────────────────────
         // Singleton: one HttpClient, one token store for the whole app lifetime
         builder.Services.AddSingleton<BapalaApiService>();
+
+        // Platform-specific LAN server discovery (mDNS/NSD)
+#if ANDROID
+        builder.Services.AddSingleton<IServerDiscoveryService, AndroidServerDiscoveryService>();
+#elif IOS
+        builder.Services.AddSingleton<IServerDiscoveryService, IosServerDiscoveryService>();
+#endif
 
         // ── ViewModels ────────────────────────────────────────────────────────
         // Transient so each navigation to a page gets fresh VM state

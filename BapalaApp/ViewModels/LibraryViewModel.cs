@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using BapalaApp.Models;
 using BapalaApp.Services;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace BapalaApp.ViewModels;
 
@@ -12,17 +13,44 @@ public partial class LibraryViewModel : BaseViewModel
 
     // ── Observable state ──────────────────────────────────────────────────────
 
-    [ObservableProperty] private ObservableCollection<MediaItem> _items = [];
-    [ObservableProperty] private string _searchText = string.Empty;
-    [ObservableProperty] private string? _selectedType;        // null = "All"
-    [ObservableProperty] private bool   _showFavorites;
-    [ObservableProperty] private int    _currentPage   = 1;
-    [ObservableProperty] private int    _totalItems;
-    [ObservableProperty] private bool   _isRefreshing;
-    [ObservableProperty] private bool   _hasPreviousPage;
-    [ObservableProperty] private bool   _hasNextPage;
-    [ObservableProperty] private string _sortBy   = "dateAdded";
-    [ObservableProperty] private bool   _sortDesc = true;
+    [ObservableProperty] private ObservableCollection<MediaItem>             _items             = [];
+    [ObservableProperty] private ObservableCollection<ContinueWatchingItem> _continueWatching  = [];
+    [ObservableProperty] private string   _searchText    = string.Empty;
+    [ObservableProperty] private string?  _selectedType;        // null = "All"
+    [ObservableProperty] private bool     _showFavorites;
+    [ObservableProperty] private int      _currentPage   = 1;
+    [ObservableProperty] private int      _totalItems;
+    [ObservableProperty] private bool     _isRefreshing;
+    [ObservableProperty] private bool     _hasPreviousPage;
+    [ObservableProperty] private bool     _hasNextPage;
+    [ObservableProperty] private string   _sortBy        = "dateAdded";
+    [ObservableProperty] private bool     _sortDesc      = true;
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStats))]
+    private LibraryStats? _stats;
+
+    public bool HasStats             => _stats != null;
+    public bool HasContinueWatching  => ContinueWatching.Count > 0;
+
+    // ── TMDB bulk refresh progress ────────────────────────────────────────────
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TmdbProgressLabel))]
+    private int _tmdbProcessed;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TmdbProgressLabel))]
+    [NotifyPropertyChangedFor(nameof(TmdbProgressFraction))]
+    private int _tmdbTotal;
+
+    [ObservableProperty] private bool   _isTmdbRefreshing;
+    [ObservableProperty] private string _tmdbStatusText = string.Empty;
+
+    public string TmdbProgressLabel  => _tmdbTotal > 0 ? $"{_tmdbProcessed} / {_tmdbTotal}" : string.Empty;
+    public double TmdbProgressFraction => _tmdbTotal > 0 ? Math.Clamp((double)_tmdbProcessed / _tmdbTotal, 0, 1) : 0;
+
+    private HubConnection? _hubConnection;
 
     private const int PageSize = 24;
 
@@ -53,7 +81,8 @@ public partial class LibraryViewModel : BaseViewModel
         IsBusy = true;
         try
         {
-            var result = await _api.GetMediaAsync(
+            // Load main grid + continue-watching + stats concurrently
+            var mediaTask  = _api.GetMediaAsync(
                 page:      CurrentPage,
                 limit:     PageSize,
                 type:      SelectedType,
@@ -62,13 +91,40 @@ public partial class LibraryViewModel : BaseViewModel
                 sortBy:    SortBy,
                 sortDesc:  SortDesc);
 
+            // Only fetch continue-watching and stats on the first page / no active filters
+            bool isDefaultView = CurrentPage == 1
+                && SelectedType == null
+                && !ShowFavorites
+                && string.IsNullOrWhiteSpace(SearchText);
+
+            var continueTask = isDefaultView
+                ? _api.GetContinueWatchingAsync(10)
+                : Task.FromResult(new List<ContinueWatchingItem>());
+
+            var statsTask = isDefaultView
+                ? _api.GetStatsAsync()
+                : Task.FromResult<LibraryStats?>(null);
+
+            await Task.WhenAll(mediaTask, continueTask, statsTask);
+
+            var result = await mediaTask;
             Items.Clear();
             foreach (var item in result.Items) Items.Add(item);
 
-            TotalItems     = result.Total;
+            TotalItems      = result.Total;
             HasPreviousPage = CurrentPage > 1;
-            HasNextPage    = CurrentPage * PageSize < TotalItems;
+            HasNextPage     = CurrentPage * PageSize < TotalItems;
             OnPropertyChanged(nameof(PageLabel));
+
+            if (isDefaultView)
+            {
+                var cw = await continueTask;
+                ContinueWatching.Clear();
+                foreach (var cw_item in cw) ContinueWatching.Add(cw_item);
+                OnPropertyChanged(nameof(HasContinueWatching));
+
+                Stats = await statsTask;
+            }
         }
         catch (Exception ex)
         {
@@ -169,6 +225,15 @@ public partial class LibraryViewModel : BaseViewModel
         });
     }
 
+    [RelayCommand]
+    private async Task ResumeContinueWatchingAsync(ContinueWatchingItem item)
+    {
+        await Shell.Current.GoToAsync("player", new Dictionary<string, object>
+        {
+            ["MediaId"] = item.Id
+        });
+    }
+
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
     [RelayCommand]
@@ -206,6 +271,95 @@ public partial class LibraryViewModel : BaseViewModel
         {
             await Shell.Current.DisplayAlert("Error", $"Delete failed: {ex.Message}", "OK");
         }
+    }
+
+    // ── Bulk TMDB refresh ─────────────────────────────────────────────────────
+
+    [RelayCommand]
+    private async Task RefreshAllTmdbAsync(bool force = false)
+    {
+        if (IsTmdbRefreshing) return;
+
+        bool confirmed = await Shell.Current.DisplayAlert(
+            "Refresh TMDB Metadata",
+            force
+                ? "Re-fetch metadata for ALL items, including those already enriched?\nThis may take several minutes."
+                : "Fetch missing posters, descriptions and ratings from TMDB?\nItems that already have full metadata will be skipped.",
+            "Continue", "Cancel");
+
+        if (!confirmed) return;
+
+        // Connect to the SignalR hub so we receive live progress
+        await ConnectHubAsync();
+
+        IsTmdbRefreshing = true;
+        TmdbStatusText   = "Starting…";
+        TmdbProcessed    = 0;
+        TmdbTotal        = 0;
+
+        var started = await _api.RefreshTmdbAllAsync(force);
+        if (!started)
+        {
+            IsTmdbRefreshing = false;
+            TmdbStatusText   = string.Empty;
+            await Shell.Current.DisplayAlert("Error", "Could not start TMDB refresh. Check server connectivity.", "OK");
+        }
+        // Completion is handled by TmdbRefreshCompleted SignalR event
+    }
+
+    private async Task ConnectHubAsync()
+    {
+        if (_hubConnection?.State == HubConnectionState.Connected) return;
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl($"{_api.ServerUrl}/hubs/scan", opts =>
+            {
+                opts.AccessTokenProvider = () => Task.FromResult(_api.CachedToken);
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<object>("TmdbRefreshStarted", data =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                TmdbStatusText = "Fetching metadata…";
+            });
+        });
+
+        _hubConnection.On("TmdbRefreshProgress", (int processed, int total, string title, bool success) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                TmdbProcessed  = processed;
+                TmdbTotal      = total;
+                TmdbStatusText = success ? $"✓ {title}" : $"— {title}";
+                OnPropertyChanged(nameof(TmdbProgressLabel));
+                OnPropertyChanged(nameof(TmdbProgressFraction));
+            });
+        });
+
+        _hubConnection.On("TmdbRefreshCompleted", (int updated, int skipped, int failed, int total) =>
+        {
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                IsTmdbRefreshing = false;
+                TmdbStatusText   = $"Done — {updated} updated, {skipped} skipped, {failed} failed";
+                await LoadAsync();    // refresh the grid with new posters
+            });
+        });
+
+        _hubConnection.On("TmdbRefreshError", (string error) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                IsTmdbRefreshing = false;
+                TmdbStatusText   = $"Error: {error}";
+            });
+        });
+
+        try { await _hubConnection.StartAsync(); }
+        catch { /* hub is best-effort; progress won't show but refresh still runs */ }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

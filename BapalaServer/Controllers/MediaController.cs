@@ -154,6 +154,55 @@ public class MediaController(
         return Ok(new { ProgressSeconds = history?.ProgressSeconds ?? 0 });
     }
 
+    // ── Continue watching ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns media items the authenticated user has started but not finished,
+    /// ordered most-recently-watched first.
+    /// </summary>
+    /// <param name="limit">Maximum number of items to return (default 20, max 50).</param>
+    /// <response code="200">List of in-progress items with their saved position.</response>
+    [HttpGet("continue-watching")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetContinueWatching([FromQuery] int limit = 20)
+    {
+        limit = Math.Clamp(limit, 1, 50);
+        var rows = await repo.GetContinueWatchingAsync(limit);
+
+        var result = rows.Select(r => new
+        {
+            r.Item.Id,
+            r.Item.Title,
+            r.Item.Year,
+            Type          = r.Item.Type.ToString(),
+            r.Item.PosterPath,
+            r.Item.BackdropPath,
+            r.Item.DurationSeconds,
+            r.Item.Rating,
+            r.Item.IsFavorite,
+            r.Item.DateAdded,
+            ProgressSeconds = r.History.ProgressSeconds,
+            WatchedAt       = r.History.WatchedAt,
+        });
+
+        return Ok(result);
+    }
+
+    // ── Library statistics ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns aggregate counts for the entire media library.
+    /// Useful for dashboard / home-screen widgets.
+    /// </summary>
+    /// <response code="200">Library statistics object.</response>
+    [HttpGet("stats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStats()
+    {
+        var stats = await repo.GetLibraryStatsAsync();
+        return Ok(stats);
+    }
+
     // ── Bulk section/type change ──────────────────────────────────────────────
     /// <summary>Change the media type for multiple items at once.</summary>
     /// <response code="204">Updated successfully</response>
@@ -211,6 +260,111 @@ public class MediaController(
         {
             return StatusCode(502, new { success = false, message = $"TMDB error: {ex.Message}" });
         }
+    }
+
+    // ── Bulk TMDB refresh ────────────────────────────────────────────────────
+    /// <summary>
+    /// Re-fetches TMDB metadata for every item in the library that is missing
+    /// a poster, description, or rating.  Runs in the background; progress is
+    /// broadcast over the SignalR hub at /hubs/scan using the events:
+    ///   TmdbRefreshStarted   { total }
+    ///   TmdbRefreshProgress  { processed, total, title, success }
+    ///   TmdbRefreshCompleted { updated, skipped, failed, total }
+    ///   TmdbRefreshError     { error }
+    /// </summary>
+    /// <param name="force">
+    ///   When true, refreshes all items including those that already have full metadata.
+    ///   When false (default), only items missing poster/description/rating are refreshed.
+    /// </param>
+    [HttpPost("refresh-tmdb-all")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    public IActionResult RefreshTmdbAll([FromQuery] bool force = false)
+    {
+        _ = Task.Run(async () =>
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var tmdb  = scope.ServiceProvider.GetRequiredService<ITmdbService>();
+            var repo2 = scope.ServiceProvider.GetRequiredService<IMediaRepository>();
+
+            try
+            {
+                // Fetch ALL items (no pagination) — use a large limit
+                var all = await repo2.GetAllAsync(
+                    page: 1, limit: int.MaxValue,
+                    type: null, genre: null, search: null,
+                    favoritesOnly: false,
+                    sortBy: "dateAdded", sortDesc: false);
+
+                var items = force
+                    ? all.ToList()
+                    : all.Where(i =>
+                          string.IsNullOrWhiteSpace(i.PosterPath)   ||
+                          string.IsNullOrWhiteSpace(i.Description)  ||
+                          !i.Rating.HasValue).ToList();
+
+                await hub.Clients.All.SendAsync("TmdbRefreshStarted", new { total = items.Count });
+
+                int updated = 0, skipped = 0, failed = 0;
+
+                for (int i = 0; i < items.Count; i++)
+                {
+                    var item = items[i];
+                    bool success = false;
+
+                    try
+                    {
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                        var meta = await tmdb.FetchMetadataAsync(item.Title, item.Year, item.Type, cts.Token);
+
+                        if (meta != null)
+                        {
+                            item.Description  = meta.Description  ?? item.Description;
+                            item.Genres       = meta.Genres        ?? item.Genres;
+                            item.Rating       = meta.Rating        ?? item.Rating;
+                            item.TmdbId       = meta.TmdbId;
+                            item.PosterPath   = meta.PosterPath    ?? item.PosterPath;
+                            item.BackdropPath = meta.BackdropPath  ?? item.BackdropPath;
+                            await repo2.UpdateAsync(item);
+                            updated++;
+                            success = true;
+                        }
+                        else
+                        {
+                            skipped++;
+                        }
+                    }
+                    catch
+                    {
+                        failed++;
+                    }
+
+                    await hub.Clients.All.SendAsync("TmdbRefreshProgress", new
+                    {
+                        processed = i + 1,
+                        total     = items.Count,
+                        title     = item.Title,
+                        success,
+                    });
+
+                    // Respect TMDB rate limit: ~40 requests/10 s → ~250 ms between calls
+                    await Task.Delay(260);
+                }
+
+                await hub.Clients.All.SendAsync("TmdbRefreshCompleted", new
+                {
+                    updated,
+                    skipped,
+                    failed,
+                    total = items.Count,
+                });
+            }
+            catch (Exception ex)
+            {
+                await hub.Clients.All.SendAsync("TmdbRefreshError", new { error = ex.Message });
+            }
+        });
+
+        return Accepted(new { message = "TMDB refresh started. Connect to /hubs/scan for progress." });
     }
 
     // ── Library scan ─────────────────────────────────────────────────────────
