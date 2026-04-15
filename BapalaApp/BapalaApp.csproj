@@ -1,10 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net9.0-android;net9.0-ios</TargetFrameworks>
-    <!-- Explicit RuntimeIdentifiers so dotnet publish produces one APK per ABI.
-         Without this, AndroidCreatePackagePerAbi is ignored and only the
-         host machine's default ABI (arm64-v8a) is produced. -->
-    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm;android-arm64;android-x64</RuntimeIdentifiers>
+    <!-- RuntimeIdentifiers: list ALL platforms so the IDE and CI can restore correctly.
+         For split APKs, pass -r explicitly on the command line:
+           dotnet publish -f net9.0-android -r android-arm    (armeabi-v7a — TV boxes)
+           dotnet publish -f net9.0-android -r android-arm64  (arm64-v8a   — phones)
+           dotnet publish -f net9.0-android -r android-x64    (x86_64      — emulator)
+         The plain 'dotnet build' command uses the host default ABI only. -->
+    <RuntimeIdentifiers>android-arm;android-arm64;android-x64;ios-arm64</RuntimeIdentifiers>
     <OutputType>Exe</OutputType>
     <RootNamespace>BapalaApp</RootNamespace>
     <UseMaui>true</UseMaui>

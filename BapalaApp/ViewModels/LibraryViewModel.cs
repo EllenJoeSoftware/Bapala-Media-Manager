@@ -47,8 +47,8 @@ public partial class LibraryViewModel : BaseViewModel
     [ObservableProperty] private bool   _isTmdbRefreshing;
     [ObservableProperty] private string _tmdbStatusText = string.Empty;
 
-    public string TmdbProgressLabel  => TmdbTotal > 0 ? $"{_tmdbProcessed} / {TmdbTotal}" : string.Empty;
-    public double TmdbProgressFraction => TmdbTotal > 0 ? Math.Clamp((double)_tmdbProcessed / TmdbTotal, 0, 1) : 0;
+    public string TmdbProgressLabel  => TmdbTotal > 0 ? $"{TmdbProcessed} / {TmdbTotal}" : string.Empty;
+    public double TmdbProgressFraction => TmdbTotal > 0 ? Math.Clamp((double)TmdbProcessed / TmdbTotal, 0, 1) : 0;
 
     private HubConnection? _hubConnection;
 
