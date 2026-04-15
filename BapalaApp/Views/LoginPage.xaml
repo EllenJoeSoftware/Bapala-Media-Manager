@@ -92,8 +92,7 @@
                                     BackgroundColor="#252538"
                                     Stroke="#3A3A50"
                                     StrokeThickness="1"
-                                    StrokeShape="RoundRectangle 10"
-                                    IsTabStop="True">
+                                    StrokeShape="RoundRectangle 10">
                                     <VisualStateManager.VisualStateGroups>
                                         <VisualStateGroupList>
                                             <VisualStateGroup x:Name="CommonStates">
