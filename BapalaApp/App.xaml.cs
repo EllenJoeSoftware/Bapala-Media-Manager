@@ -13,6 +13,18 @@ public partial class App : Application
         _api      = api;
         _services = services;
         InitializeComponent();
+
+        // When any API call gets a 401, the token has expired.
+        // Clear auth and send the user back to the login page from anywhere in the app.
+        _api.OnSessionExpired += () =>
+        {
+            Dispatcher.Dispatch(() =>
+            {
+                if (Windows.Count > 0)
+                    Windows[0].Page = new NavigationPage(
+                        _services.GetRequiredService<LoginPage>());
+            });
+        };
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

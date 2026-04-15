@@ -29,6 +29,12 @@ public class BapalaApiService
     private readonly HttpClient _http;
     private string? _cachedToken;   // kept in memory after InitAsync so GetStreamUrl never blocks
 
+    /// <summary>
+    /// Raised when any API call receives 401 Unauthorized (token expired or revoked).
+    /// Subscribe in App.xaml.cs to redirect the user back to the login page.
+    /// </summary>
+    public event Action? OnSessionExpired;
+
     public string? ServerUrl { get; private set; }
     public bool IsAuthenticated { get; private set; }
 
@@ -280,9 +286,19 @@ public class BapalaApiService
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static async Task EnsureSuccessAsync(HttpResponseMessage resp)
+    private async Task EnsureSuccessAsync(HttpResponseMessage resp)
     {
         if (resp.IsSuccessStatusCode) return;
+
+        // Token expired or revoked — clear local auth and notify the app
+        // so it can redirect the user to the login page immediately.
+        if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Logout();
+            OnSessionExpired?.Invoke();
+            throw new HttpRequestException("Session expired. Please log in again.");
+        }
+
         var body = await resp.Content.ReadAsStringAsync();
         throw new HttpRequestException($"HTTP {(int)resp.StatusCode}: {body}");
     }
