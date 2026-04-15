@@ -1,15 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net9.0-android;net9.0-ios</TargetFrameworks>
-    <!-- RuntimeIdentifiers: used by restore and IDE tooling -->
-    <RuntimeIdentifiers>android-arm;android-arm64;android-x64;ios-arm64</RuntimeIdentifiers>
-
-    <!-- Produce one APK per ABI when publishing.
-         android-arm   → armeabi-v7a (TV boxes / older 32-bit ARM devices)
-         android-arm64 → arm64-v8a   (modern phones and tablets)
-         android-x64   → x86_64      (emulators)
-         Run:  dotnet publish -f net9.0-android -c Release
-         All three signed APKs will appear in bin/Release/net9.0-android/publish/ -->
+    <!-- RuntimeIdentifiers must be platform-scoped — the Android toolchain
+         errors (XA0035) if it sees 'ios-arm64' during an Android build.
+         Produce one APK per ABI:  dotnet publish -f net9.0-android -c Release -->
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm;android-arm64;android-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">ios-arm64</RuntimeIdentifiers>
     <AndroidCreatePackagePerAbi Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">true</AndroidCreatePackagePerAbi>
     <AndroidSupportedAbis Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">armeabi-v7a;arm64-v8a;x86_64</AndroidSupportedAbis>
     <OutputType>Exe</OutputType>
